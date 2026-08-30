@@ -133,6 +133,73 @@ describe("control plane end-to-end", () => {
     expect(JSON.stringify(audit)).not.toContain("mock-secret-key");
   });
 
+  it("distributes a Bitwarden connection's pre-provisioned token when authorized, and still enforces RBAC", async () => {
+    const org = (
+      await app.inject({ method: "POST", url: "/v1/organizations", payload: { name: "Acme Corp" } })
+    ).json();
+    const identity = (
+      await app.inject({
+        method: "POST",
+        url: "/v1/service-identities",
+        payload: { orgId: org.id, name: "ci-deploy-bot" },
+      })
+    ).json();
+    const authHeader = { authorization: `Bearer ${identity.bootstrapToken}` };
+
+    const connection = (
+      await app.inject({
+        method: "POST",
+        url: "/v1/connections",
+        payload: {
+          orgId: org.id,
+          alias: "bw-prod",
+          provider: "bitwarden",
+          credential: { accessToken: "0.machine-account-token", organizationId: "bw-org-1" },
+        },
+      })
+    ).json();
+    expect(connection).not.toHaveProperty("credential");
+
+    const role = (
+      await app.inject({ method: "POST", url: "/v1/roles", payload: { orgId: org.id, name: "ci-deploy" } })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/v1/roles/${role.id}/bindings`,
+      payload: { serviceIdentityId: identity.id },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/v1/roles/${role.id}/grants`,
+      payload: { vaultConnectionId: connection.id, pathPattern: "prod-db", maxTtlSeconds: 300 },
+    });
+
+    // In scope: distributes the stored token. No STS/network call at all -
+    // this is a lookup, not a mint.
+    const mintResponse = await app.inject({
+      method: "POST",
+      url: "/v1/credentials/mint",
+      headers: authHeader,
+      payload: { alias: "bw-prod", path: "prod-db" },
+    });
+    expect(mintResponse.statusCode).toBe(200);
+    const minted = mintResponse.json();
+    expect(minted.provider).toBe("bitwarden");
+    expect(minted.credentials.accessToken).toBe("0.machine-account-token");
+    expect(minted.credentials.organizationId).toBe("bw-org-1");
+    expect(minted.credentials.note).toMatch(/not.*freshly minted/i);
+    expect(stsSend).not.toHaveBeenCalled();
+
+    // Out of scope: same RBAC path as AWS - still denied.
+    const deniedResponse = await app.inject({
+      method: "POST",
+      url: "/v1/credentials/mint",
+      headers: authHeader,
+      payload: { alias: "bw-prod", path: "prod-billing" },
+    });
+    expect(deniedResponse.statusCode).toBe(403);
+  });
+
   it("rejects a request with a bootstrap token that belongs to no service identity", async () => {
     const response = await app.inject({
       method: "POST",

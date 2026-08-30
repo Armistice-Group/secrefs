@@ -1,20 +1,43 @@
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../context.js";
 import type { AwsMasterCredential } from "../providers/awsSts.js";
+import type { BitwardenMasterCredential } from "../providers/bitwarden.js";
+import type { VaultProviderKind } from "../db/repo.js";
 
 interface CreateConnectionBody {
   orgId: string;
   alias: string;
-  provider: "aws";
-  credential: AwsMasterCredential;
+  provider: VaultProviderKind;
+  credential: AwsMasterCredential | BitwardenMasterCredential;
+}
+
+/** True only when `credential` has every field `provider` requires -
+ * narrows the union so the stored blob always matches what the mint route
+ * (and the SDK on the other end) expects to find for that provider. */
+function isValidCredentialFor(
+  provider: VaultProviderKind,
+  credential: CreateConnectionBody["credential"],
+): boolean {
+  if (provider === "aws") {
+    const c = credential as Partial<AwsMasterCredential>;
+    return Boolean(c.roleArn && c.region);
+  }
+  const c = credential as Partial<BitwardenMasterCredential>;
+  return Boolean(c.accessToken);
 }
 
 export function registerConnectionRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post<{ Body: CreateConnectionBody }>("/v1/connections", async (request, reply) => {
     const { orgId, alias, provider, credential } = request.body ?? {};
-    if (!orgId || !alias || provider !== "aws" || !credential?.roleArn || !credential?.region) {
+    if (!orgId || !alias || (provider !== "aws" && provider !== "bitwarden")) {
+      return reply.code(400).send({ error: 'orgId, alias, and provider ("aws" | "bitwarden") are required' });
+    }
+    if (!credential || !isValidCredentialFor(provider, credential)) {
       return reply.code(400).send({
-        error: "orgId, alias, provider (\"aws\"), and credential { roleArn, region } are required",
+        error:
+          provider === "aws"
+            ? "credential { roleArn, region } is required for provider \"aws\""
+            : "credential { accessToken } is required for provider \"bitwarden\"",
       });
     }
 

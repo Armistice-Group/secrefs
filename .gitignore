@@ -15,6 +15,11 @@ out/
 !.env.example
 .secrefs.local.json
 
+# control plane local dev database (org vault connections, encrypted at
+# rest or not - never belongs in git)
+*.sqlite3
+*.sqlite3-*
+
 # logs
 *.log
 npm-debug.log*

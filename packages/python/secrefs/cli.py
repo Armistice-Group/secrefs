@@ -10,21 +10,18 @@ from pathlib import Path
 from typing import List
 
 from . import SecRefs, SecRefsResolutionError
+from .envfile import parse_env_file_text
 
 
 def _load_dotenv(path: Path) -> None:
-    """Minimal .env loader: KEY=VALUE per line, '#' comments, no interpolation."""
+    """Loads a `.env` file into `os.environ`, correctly preserving
+    `sec://...#field` fragments (see `envfile.py`). Mirrors dotenv.config()'s
+    default precedence: never overrides a value already present in
+    `os.environ` (e.g. set explicitly by the shell/CI)."""
     if not path.exists():
         return
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
-            value = value[1:-1]
+    parsed = parse_env_file_text(path.read_text(encoding="utf-8"))
+    for key, value in parsed.items():
         os.environ.setdefault(key, value)
 
 

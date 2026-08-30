@@ -12,10 +12,12 @@ export interface ServiceIdentity {
   name: string;
 }
 
+export type VaultProviderKind = "aws" | "bitwarden";
+
 export interface VaultConnection {
   id: string;
   org_id: string;
-  provider: "aws";
+  provider: VaultProviderKind;
   alias: string;
   encrypted_credential: string;
 }
@@ -68,7 +70,7 @@ export class ControlPlaneRepo {
 
   createVaultConnection(
     orgId: string,
-    provider: "aws",
+    provider: VaultProviderKind,
     alias: string,
     encryptedCredential: string,
   ): VaultConnection {

@@ -27,12 +27,15 @@ CREATE TABLE IF NOT EXISTS service_identities (
 
 -- One connected vault. \`alias\` is the same alias used in \`sec://<alias>/...\`
 -- references. \`encrypted_credential\` is an envelope-encrypted JSON blob
--- (see src/crypto/cipher.ts) - for the "aws" provider it decrypts to
--- { roleArn, region, externalId? }. Never returned by any read API.
+-- (see src/crypto/cipher.ts) - for "aws" it decrypts to
+-- { roleArn, region, externalId? }; for "bitwarden", to
+-- { accessToken, organizationId? } (see src/providers/bitwarden.ts for why
+-- that one is distributed as-is rather than minted per request). Never
+-- returned by any read API.
 CREATE TABLE IF NOT EXISTS vault_connections (
   id TEXT PRIMARY KEY,
   org_id TEXT NOT NULL REFERENCES organizations(id),
-  provider TEXT NOT NULL CHECK (provider IN ('aws')),
+  provider TEXT NOT NULL CHECK (provider IN ('aws', 'bitwarden')),
   alias TEXT NOT NULL,
   encrypted_credential TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),

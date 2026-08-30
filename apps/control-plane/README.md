@@ -37,7 +37,7 @@ production build described in the design doc. Specifically:
   `src/providers/awsSts.ts`) rather than resolved to the exact ARN AWS
   assigned — noted as a known simplification there.
 
-## Run it
+## Run it locally (no Docker)
 
 ```bash
 pnpm --filter @secrefs/control-plane build
@@ -53,6 +53,62 @@ Or for local iteration: `pnpm --filter @secrefs/control-plane dev` (same
 | `PORT` | `8787` | HTTP port |
 | `SECREFS_CP_DB_PATH` | `./control-plane.sqlite3` | SQLite file (`:memory:` is also valid, but non-persistent) |
 | `SECREFS_CP_CIPHER_KEY` | *(required)* | Base64, must decode to exactly 32 bytes — see the generator command above |
+
+## Self-hosting
+
+There's no SecRefs-hosted version of this yet — today, self-hosting *is*
+how you run a control plane at all. `Dockerfile` and `docker-compose.yml`
+in this directory are a real, tested deployment path, not aspirational:
+
+```bash
+cd apps/control-plane
+export SECREFS_CP_CIPHER_KEY=$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))")
+docker compose up --build
+```
+
+Listens on `:8787`. Data — org connections, roles, grants, the full audit
+log, all in one SQLite file — persists in the `data` named volume across
+container restarts (verified: connect a vault, restart the container, the
+connection and audit trail are still there).
+
+To build the image directly instead of via compose (must be run from the
+**repo root**, since it needs the workspace's `package.json` files to
+resolve `pnpm-lock.yaml`):
+
+```bash
+docker build -f apps/control-plane/Dockerfile -t secrefs-control-plane .
+docker run -p 8787:8787 \
+  -e SECREFS_CP_CIPHER_KEY=... \
+  -e SECREFS_CP_DB_PATH=/data/control-plane.sqlite3 \
+  -v secrefs-cp-data:/data \
+  secrefs-control-plane
+```
+
+**Before pointing this at anything real, understand what self-hosting it
+does *not* change** — it's the same v1 scaffold either way, all of "What
+this is, honestly" below still applies in full. Self-hosting moves *where*
+the container runs; it doesn't add KMS custody, real auth, or migrations.
+Specifically, as the operator, you now own:
+
+- **The cipher key's lifecycle.** `SECREFS_CP_CIPHER_KEY` is the only
+  thing standing between the SQLite file and every connected org's vault
+  credentials. Nothing here rotates it, backs it up, or recovers it if
+  lost — losing the key makes every stored `VaultConnection` permanently
+  undecryptable; losing the key *and* having it leak is worse. Generate it
+  with a real secret manager, not a shell one-liner kept in your own
+  `.env`.
+- **The SQLite file's backup/durability story.** One file holds every
+  org's encrypted connections, RBAC config, and audit log. The named
+  volume survives a container restart (verified above) but is only as
+  durable as wherever Docker's volume actually lives - back it up like
+  you would any production database, because it is one.
+- **TLS and network exposure.** The container serves plain HTTP on
+  `:8787`. Put a real TLS-terminating proxy in front before this is
+  reachable from anywhere you wouldn't trust with the requests it
+  authorizes.
+- **The `/healthz` endpoint** is wired into `docker-compose.yml`'s
+  healthcheck already - point your own orchestrator's liveness probe at
+  it too.
 
 ## API surface (v1)
 

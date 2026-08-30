@@ -1,0 +1,30 @@
+# Quickstart for self-hosting the control plane. From this directory:
+#
+#   SECREFS_CP_CIPHER_KEY=$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))") \
+#     docker compose up --build
+#
+# The service listens on :8787. Data (org connections, roles, grants,
+# audit log - all in one SQLite file) persists in the `data` named volume
+# across restarts. See README.md ("Self-hosting") for what this
+# quickstart deliberately does not cover (real KMS custody, OIDC auth,
+# TLS termination, backups) before pointing this at anything real.
+services:
+  control-plane:
+    build:
+      context: ../..
+      dockerfile: apps/control-plane/Dockerfile
+    ports:
+      - "8787:8787"
+    environment:
+      SECREFS_CP_CIPHER_KEY: ${SECREFS_CP_CIPHER_KEY:?set SECREFS_CP_CIPHER_KEY - see README.md}
+      SECREFS_CP_DB_PATH: /data/control-plane.sqlite3
+    volumes:
+      - data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8787/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  data:

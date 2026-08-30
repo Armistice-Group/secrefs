@@ -1,6 +1,10 @@
 # The SecRefs control plane
 
-**Status:** Proposed — not yet built. Nothing in this doc exists in code yet.
+**Status:** v1 scaffold built and merged (`apps/control-plane`) — AWS +
+Bitwarden connections, RBAC, audit log, self-hostable via Docker. Still a
+scaffold, not the hardened production version this doc describes: no KMS
+custody, no OIDC auth, no migrations. See `apps/control-plane/README.md`
+for the full, current honesty list.
 **Author:** drafted by Claude with Nathan, 2026-08-30.
 
 ## 1. Why
@@ -84,6 +88,18 @@ the org hands it to SecRefs?
   already works) that holds the real master token; the control plane talks
   *only* to the connector, never sees the master token at all. Strictly
   stronger trust model, meaningfully more ops burden for the org.
+
+**Deployment topology changes which of these actually matters.** This
+custody question was originally framed assuming a SecRefs-hosted SaaS
+instance. `apps/control-plane` turned out to also be **self-hostable**
+(Docker + a documented deploy path, see its README) — an org can run the
+whole control plane themselves instead of using one SecRefs hosts. For a
+self-hoster, the "v1 KMS-encrypted at rest" custody model already lives
+entirely inside their own infra (their own cipher key, their own SQLite
+file, their own container) — the self-hosted-connector idea below is
+solving a problem a self-hoster doesn't have. It stays relevant for the
+other topology: an org using a *SecRefs-hosted* instance who wants their
+master token to never reach SecRefs' infra at all.
 
 Model `VaultConnection` (§5) so a connection is either
 `{ encrypted_credential }` or `{ connector_url }` — v2 is additive, not a
@@ -215,27 +231,33 @@ on `AwsSecretsManagerProvider`/`VaultProvider` don't need to change at all.
   token costs you exactly what its `Role` grants — not the org's AWS role
   or 1Password vault outright.
 
-## 10. Proposed repo layout (not yet created)
+## 10. Repo layout
 
 ```
-apps/control-plane/          -- API + admin console (Next.js API routes or a
-                                 separate service; TBD when we scaffold)
-packages/control-plane-client/  -- thin client the Node/Python SDKs call;
-                                    or fold directly into packages/node,
-                                    packages/python as an internal module
+apps/control-plane/   -- a standalone Fastify service (not Next.js API
+                          routes) - no admin console UI yet (§11 - that's
+                          v2). Dockerfile + docker-compose.yml included;
+                          self-hostable today (see its README).
 ```
 
-Left open deliberately — this is a scaffolding-time decision, not a
-design-doc one.
+The `packages/control-plane-client/` idea (a thin client the Node/Python
+SDKs call to source credentials from a running control plane instead of
+purely ambient env vars) is still unbuilt - today's SDK providers only
+know ambient auth. That's the piece that would make a `secrefs run`
+against `sec://aws-prod/...` actually go through the control plane rather
+than requiring the org to hand-place a minted credential into the
+environment themselves.
 
 ## 11. Phased rollout
 
 - **v1:** AWS Secrets Manager only. KMS-encrypted connection storage.
   RBAC + audit log. Workload-identity auth for CI, bootstrap token
   fallback. No admin UI yet — API + CLI (`secrefs connect`, `secrefs grant`)
-  is enough to prove the model. **Status: scaffolded in `apps/control-plane`**
-  (PR #3) — bootstrap-token auth and a local-dev cipher key so far, not yet
-  the KMS/workload-identity production versions of those two pieces.
+  is enough to prove the model. **Status: built and merged**
+  (`apps/control-plane`) — AWS *and* Bitwarden connections (ahead of the
+  original v1/v2 split, per Nathan's request), self-hostable via Docker.
+  Bootstrap-token auth and a local-dev cipher key so far, not yet the
+  KMS/workload-identity production versions of those two pieces.
 - **v2:** 1Password + Bitwarden + GCP Secret Manager connections. Admin
   console (the piece that actually needs a UI — connection setup, role
   management, audit view).

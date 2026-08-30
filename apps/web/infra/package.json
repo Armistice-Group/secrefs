@@ -1,0 +1,23 @@
+{
+  "name": "@secrefs/web-infra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK stack for secrefs.com: Route 53 + ACM + S3 + CloudFront",
+  "scripts": {
+    "build": "tsc",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "aws-cdk": "^2.160.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.160.0",
+    "constructs": "^10.3.0"
+  }
+}

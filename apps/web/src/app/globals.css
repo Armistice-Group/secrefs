@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #05070a;
+}
+
+::selection {
+  background-color: rgba(78, 232, 176, 0.25);
+  color: #eafff5;
+}
+
+@layer components {
+  .terminal {
+    @apply rounded-lg border border-white/10 bg-ink-900/80 shadow-2xl shadow-black/40 backdrop-blur;
+  }
+
+  .terminal-header {
+    @apply flex items-center gap-1.5 border-b border-white/10 px-4 py-2.5;
+  }
+
+  .terminal-dot {
+    @apply h-2.5 w-2.5 rounded-full;
+  }
+
+  .prompt::before {
+    content: "$ ";
+    @apply text-signal-500/70;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 30px rgba(78, 232, 176, 0.35);
+  }
+}

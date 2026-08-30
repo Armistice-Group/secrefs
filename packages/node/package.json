@@ -1,0 +1,56 @@
+{
+  "name": "@secrefs/node",
+  "version": "0.1.0",
+  "description": "BYOV secret reference engine for Node.js - expand sec:// references in memory at runtime",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./parser": {
+      "types": "./dist/parser.d.ts",
+      "import": "./dist/parser.js",
+      "require": "./dist/parser.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "secrefs": "./dist/secrefs.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"(no linter configured)\" && exit 0",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.658.1",
+    "commander": "^12.1.0",
+    "cross-spawn": "^7.0.3",
+    "dotenv": "^16.4.5",
+    "node-vault": "^0.10.2"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^22.7.4",
+    "rimraf": "^6.0.1",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

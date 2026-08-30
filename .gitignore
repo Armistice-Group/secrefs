@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# never commit real secrets or local secret files
+.env
+.env.*
+!.env.example
+.secrefs.local.json
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# test/coverage
+coverage/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+dist-python/
+
+# infra
+cdk.out/
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# editors/os
+.DS_Store
+.vscode/
+.idea/

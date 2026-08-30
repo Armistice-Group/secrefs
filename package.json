@@ -1,0 +1,22 @@
+{
+  "name": "secrefs",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SecRefs (secrefs.com) - Bring Your Own Vault (BYOV) secret reference engine",
+  "packageManager": "pnpm@9.7.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.2",
+    "typescript": "^5.6.2"
+  }
+}

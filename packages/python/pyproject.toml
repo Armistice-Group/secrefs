@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "secrefs"
+version = "0.1.0"
+description = "BYOV secret reference engine - expand sec:// references in memory at runtime"
+authors = ["SecRefs <hello@secrefs.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://secrefs.com"
+repository = "https://github.com/secrefs/secrefs"
+packages = [{ include = "secrefs" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+boto3 = "^1.34"
+hvac = "^2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+pytest-asyncio = "^0.23"
+mypy = "^1.10"
+
+[tool.poetry.scripts]
+secrefs-py = "secrefs.cli:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+strict = true
+
+# boto3/hvac ship without inline type stubs (py.typed) or a matching
+# stub-only package pinned in this project; suppress the import warning
+# for just these two rather than pulling in a heavy generated-stub
+# dependency (e.g. boto3-stubs) not called for in the project spec.
+[[tool.mypy.overrides]]
+module = ["boto3.*", "hvac.*"]
+ignore_missing_imports = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

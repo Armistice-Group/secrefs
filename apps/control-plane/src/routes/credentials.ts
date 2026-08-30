@@ -3,6 +3,8 @@ import type { AppContext } from "../context.js";
 import { resolvePrincipal } from "../auth/principal.js";
 import { authorize } from "../rbac/authorize.js";
 import { mintAwsCredential, type AwsMasterCredential } from "../providers/awsSts.js";
+import { distributeBitwardenCredential, type BitwardenMasterCredential } from "../providers/bitwarden.js";
+import type { VaultConnection } from "../db/repo.js";
 
 interface MintBody {
   alias: string;
@@ -10,9 +12,38 @@ interface MintBody {
 }
 
 /**
+ * Dispatches to the right per-provider handling once a request has
+ * already been authorized. AWS mints a fresh, narrowly-scoped credential;
+ * Bitwarden distributes its one pre-provisioned token as-is (see
+ * providers/bitwarden.ts - not the same guarantee, deliberately not
+ * pretended to be).
+ */
+async function resolveCredential(
+  ctx: AppContext,
+  connection: VaultConnection,
+  path: string,
+  ttlSeconds: number,
+): Promise<{ provider: string; credentials: unknown }> {
+  const raw = JSON.parse(ctx.cipher.decrypt(connection.encrypted_credential)) as unknown;
+
+  if (connection.provider === "aws") {
+    const credentials = await mintAwsCredential({
+      credential: raw as AwsMasterCredential,
+      path,
+      durationSeconds: ttlSeconds,
+      client: ctx.stsClient,
+    });
+    return { provider: "aws", credentials };
+  }
+
+  const credentials = distributeBitwardenCredential(raw as BitwardenMasterCredential);
+  return { provider: "bitwarden", credentials };
+}
+
+/**
  * The one endpoint that matters most (docs/control-plane-design.md §7):
- * authenticate the caller, authorize the request against its grants, mint
- * a scoped credential for the underlying vault, log the decision either
+ * authenticate the caller, authorize the request against its grants,
+ * resolve a credential for the underlying vault, log the decision either
  * way. The secret *value* is never fetched here - only a credential the
  * caller can use to fetch it themselves.
  */
@@ -43,21 +74,8 @@ export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext):
       return reply.code(403).send({ error: decision.reason });
     }
 
-    let credential: AwsMasterCredential;
     try {
-      credential = JSON.parse(ctx.cipher.decrypt(decision.connection.encrypted_credential)) as AwsMasterCredential;
-    } catch (err) {
-      request.log.error({ err }, "failed to decrypt stored connection credential");
-      return reply.code(500).send({ error: "could not decrypt connection credential" });
-    }
-
-    try {
-      const minted = await mintAwsCredential({
-        credential,
-        path,
-        durationSeconds: decision.ttlSeconds,
-        client: ctx.stsClient,
-      });
+      const resolved = await resolveCredential(ctx, decision.connection, path, decision.ttlSeconds);
 
       ctx.repo.recordAuthorizationEvent({
         orgId: identity.org_id,
@@ -68,15 +86,12 @@ export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext):
         decision: "allow",
       });
 
-      return reply.send({
-        provider: "aws" as const,
-        credentials: minted,
-      });
+      return reply.send(resolved);
     } catch (err) {
-      // A failure minting the credential is not the same as a denial - it
-      // was authorized, the underlying vault call just failed - but it
-      // still gets an audit trail entry, and the caller still never sees
-      // a partial/garbage credential.
+      // A failure resolving the credential is not the same as a denial -
+      // it was authorized, decrypting/minting just failed - but it still
+      // gets an audit trail entry, and the caller still never sees a
+      // partial/garbage credential.
       const message = err instanceof Error ? err.message : String(err);
       ctx.repo.recordAuthorizationEvent({
         orgId: identity.org_id,
@@ -85,9 +100,9 @@ export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext):
         alias,
         path,
         decision: "deny",
-        reason: `mint failed: ${message}`,
+        reason: `credential resolution failed: ${message}`,
       });
-      return reply.code(502).send({ error: `could not mint credential: ${message}` });
+      return reply.code(502).send({ error: `could not resolve credential: ${message}` });
     }
   });
 }

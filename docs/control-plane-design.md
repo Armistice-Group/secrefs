@@ -151,7 +151,7 @@ instead of a missing registry entry.
 sequenceDiagram
     participant App as SDK / CLI (secrefs run)
     participant CP as Control plane
-    participant Vault as AWS / 1Password / Bitwarden
+    participant Vault as AWS / GCP / 1Password / Bitwarden
 
     App->>CP: authenticate (OIDC token / bootstrap token)
     CP-->>App: session token (short-lived)
@@ -187,9 +187,11 @@ never becomes a hard requirement for a provider that's happy reading
 
 | Backend | Master credential org provides | Scoped credential control plane mints | Notes |
 |---|---|---|---|
-| **AWS Secrets Manager** | ARN of an IAM role SecRefs' control-plane account may assume (`sts:AssumeRole`, trust policy scoped to us) | Temporary STS credentials via `AssumeRole` + an inline session policy restricting `secretsmanager:GetSecretValue` to the matching secret ARN(s), `DurationSeconds` = `Grant.max_ttl` | Cleanest fit — STS session policies do real per-request scoping. No long-lived AWS keys ever stored. |
-| **1Password** | A [Connect](https://developer.1password.com/docs/connect/) server URL + a bootstrap access token | A vault-scoped Connect token (1Password lets you mint tokens scoped to specific vaults at creation time) matching the Grant's vaults, short TTL | Scoping granularity is per-*vault*, not per-item — `path_pattern` maps to which 1Password vault(s) a Grant covers, item-level filtering happens SDK-side against what that vault-scoped token can see. |
-| **Bitwarden** | A Bitwarden **Secrets Manager** (not the password vault) machine-account access token, scoped to a project | A narrower project-scoped access token if the Grant covers a subset of that project's secrets, else the same token re-issued with a short TTL | Bitwarden Secrets Manager's access-token model is project-scoped; sub-project (path-level) scoping is enforced SDK-side, same shape as 1Password. |
+| **AWS Secrets Manager** | ARN of an IAM role SecRefs' control-plane account may assume (`sts:AssumeRole`, trust policy scoped to us) | Temporary STS credentials via `AssumeRole` + an inline session policy restricting `secretsmanager:GetSecretValue` to the matching secret ARN(s), `DurationSeconds` = `Grant.max_ttl` | Cleanest fit among the "assume a delegated identity" backends — STS session policies do real per-request scoping. No long-lived AWS keys ever stored. Implemented — `apps/control-plane` v1. |
+| **GCP Secret Manager** | Resource name of a service account SecRefs' control-plane identity may impersonate (`roles/iam.serviceAccountTokenCreator`, via [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) — no exported service account key ever stored) | A short-lived OAuth access token via `generateAccessToken`, further restricted by an [IAM Condition](https://cloud.google.com/secret-manager/docs/access-control) matching the requested secret's resource name/prefix, `expireTime` = `Grant.max_ttl` | **Actually the cleanest of all four** — GCP's IAM Conditions scope by resource name directly (no ARN-wildcard-suffix workaround like AWS needs), and WIF means zero long-lived credential ever has to exist, not even the org's master one. Good v2 candidate alongside 1Password/Bitwarden. Not yet implemented. |
+| **1Password** | A [Connect](https://developer.1password.com/docs/connect/) server URL + a bootstrap access token | A vault-scoped Connect token (1Password lets you mint tokens scoped to specific vaults at creation time) matching the Grant's vaults, short TTL | Scoping granularity is per-*vault*, not per-item — `path_pattern` maps to which 1Password vault(s) a Grant covers, item-level filtering happens SDK-side against what that vault-scoped token can see. Not yet implemented. |
+| **Bitwarden** | A Bitwarden **Secrets Manager** (not the password vault) machine-account access token, scoped to a project | A narrower project-scoped access token if the Grant covers a subset of that project's secrets, else the same token re-issued with a short TTL | Bitwarden Secrets Manager's access-token model is project-scoped; sub-project (path-level) scoping is enforced SDK-side, same shape as 1Password. Not yet implemented. |
+| **Dashlane** | *Unresolved — see below* | *Unresolved* | Dashlane does have a [public API](https://support.dashlane.com/hc/en-us/articles/23955544757266-Dashlane-public-API) with OAuth 2.0 scoped permissions and a "Secrets" feature in the vault, but everything publicly documented reads as an **admin/enterprise management API** (provisioning, vault sync, sharing secrets with plan *members*) — not a machine-identity-first, mint-a-short-lived-credential-for-one-secret API the way Connect/Secrets Manager/STS/WIF are. Before designing a broker integration: confirm directly with Dashlane (or their API docs in detail) whether a scoped, short-TTL, single-secret-restricted token is actually mintable via their API. If not, the honest options are the explicitly-labeled "proxy mode" carve-out from §3, or not supporting Dashlane until they ship that primitive. **Don't build against an assumption here.** |
 
 `packages/node/src/providers/*` and `packages/python/secrefs/providers/*`
 each need a `credentialSource` in front of the existing constructor logic:
@@ -231,11 +233,17 @@ design-doc one.
 - **v1:** AWS Secrets Manager only. KMS-encrypted connection storage.
   RBAC + audit log. Workload-identity auth for CI, bootstrap token
   fallback. No admin UI yet — API + CLI (`secrefs connect`, `secrefs grant`)
-  is enough to prove the model.
-- **v2:** 1Password + Bitwarden connections. Admin console (the piece that
-  actually needs a UI — connection setup, role management, audit view).
+  is enough to prove the model. **Status: scaffolded in `apps/control-plane`**
+  (PR #3) — bootstrap-token auth and a local-dev cipher key so far, not yet
+  the KMS/workload-identity production versions of those two pieces.
+- **v2:** 1Password + Bitwarden + GCP Secret Manager connections. Admin
+  console (the piece that actually needs a UI — connection setup, role
+  management, audit view).
 - **v3:** Self-hosted connector option (§4) for orgs that want the master
   token to never leave their infra at all.
+- **Dashlane:** not slotted into a version — genuinely unresolved whether
+  their public API supports the scoped-short-lived-credential primitive
+  this design depends on (§8). Needs a real answer before it gets a phase.
 
 ## 12. Open questions for Nathan
 

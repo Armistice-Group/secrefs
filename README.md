@@ -63,6 +63,7 @@ asyncio.run(main())
 |---|---|---|
 | `aws` | AWS Secrets Manager | Default credential provider chain / IAM role |
 | `vault` | HashiCorp Vault (KV v1 & v2) | `VAULT_ADDR`, `VAULT_TOKEN` |
+| `bitwarden` | Bitwarden Secrets Manager | `BWS_ACCESS_TOKEN`, `BWS_ORGANIZATION_ID` (only needed to address a secret by name instead of its UUID) |
 | `local` | Gitignored `.secrefs.local.json` | none — local dev only |
 
 ## Development

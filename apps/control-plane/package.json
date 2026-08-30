@@ -8,6 +8,9 @@
   "engines": {
     "node": ">=18"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "rimraf dist && tsup",
     "dev": "tsx watch src/server.ts",

@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/out
+**/coverage
+**/*.sqlite3
+**/*.sqlite3-*
+.git
+.env
+.env.*
+!.env.example
+.secrefs.local.json

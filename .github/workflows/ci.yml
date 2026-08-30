@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only by default - this workflow only runs tests, it never needs to
+# write to the repo, publish a package, or touch a deployment.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Node (typecheck, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # better-sqlite3 (apps/control-plane) compiles a native addon on
+      # install - node-gyp needs python3 + a C++ toolchain, both already
+      # present on the ubuntu-latest runner image.
+      - run: pnpm install --frozen-lockfile
+
+      # Runs across every workspace package via turbo: @secrefs/node,
+      # @secrefs/control-plane, @secrefs/web.
+      - run: pnpm turbo run typecheck test build
+
+  python:
+    name: Python (pytest, mypy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pipx install poetry
+
+      - run: poetry install
+
+      - run: poetry run pytest -q
+
+      - run: poetry run mypy secrefs

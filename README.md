@@ -1,5 +1,7 @@
 # SecRefs
 
+[![CI](https://github.com/Armistice-Group/secrefs/actions/workflows/ci.yml/badge.svg)](https://github.com/Armistice-Group/secrefs/actions/workflows/ci.yml)
+
 **Bring Your Own Vault.** SecRefs decouples secret storage from applications by
 expanding declarative `sec://` URI references directly in memory, at runtime.
 No plaintext secret is ever written to disk or sent to a third-party SaaS vault.

@@ -252,8 +252,9 @@ different things:
    traverse the public internet or a shared NAT device. For a service whose
    entire job is brokering other organisations' vault credentials, that is
    the point, not an optimisation.
-2. It is what lets the instance boot at all with no internet route. The
-   bootstrap deliberately touches nothing outside AWS.
+2. They cover every AWS call the bootstrap makes, which leaves the
+   instance one step away from booting with no internet route at all. The
+   remaining step is the RDS CA bundle — see Known limitations.
 
 The commonly cited "endpoints are cheaper than NAT" claim does not hold at
 this scale: nine endpoints cost roughly twice a NAT gateway. They are
@@ -278,9 +279,10 @@ decrypts the org's stored access token and returns it — the SDK on the
 caller's side is what talks to Bitwarden. AWS connections do call STS,
 but that goes over the interface endpoint, not NAT.
 
-Turn it off only for a deployment that uses AWS vault connections
-exclusively, with no WorkOS admin auth and no OIDC federation — and read
-the WorkOS warning in step 3 again before you do.
+It is also needed at boot, for the RDS CA bundle (Known limitations).
+So: turn it off only for a deployment that pre-bakes that bundle and runs
+with no WorkOS admin auth and no OIDC federation — and read the WorkOS
+warning in step 3 again before you do.
 
 **Turning off both leaves an instance that cannot boot, cannot be
 reached by SSM, and cannot be recovered except by replacement.** Nothing

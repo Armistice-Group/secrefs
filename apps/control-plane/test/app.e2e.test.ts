@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import type { STSClient } from "@aws-sdk/client-sts";
+import { SignJWT, generateKeyPair, type JWTVerifyGetKey } from "jose";
 import { buildApp } from "../src/app.js";
 import { createContext } from "../src/context.js";
 import { openDatabase } from "../src/db/client.js";
@@ -30,7 +31,11 @@ describe("control plane end-to-end", () => {
     const fakeStsClient = { send: stsSend } as unknown as STSClient;
     const db = openDatabase(":memory:");
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
-    app = buildApp(createContext(db, cipher, fakeStsClient));
+    // Keeps ARN resolution (a DescribeSecret call through the freshly
+    // minted credentials) fully offline - no test here cares about exact-
+    // ARN caching specifically, that's covered in awsSts.test.ts.
+    const describeClientFactory = () => ({ send: vi.fn().mockResolvedValue({}) });
+    app = buildApp(createContext(db, cipher, { stsClient: fakeStsClient, describeClientFactory }));
   });
 
   it("connects a vault, grants scoped access, mints a credential, and denies out-of-scope access", async () => {
@@ -198,6 +203,114 @@ describe("control plane end-to-end", () => {
       payload: { alias: "bw-prod", path: "prod-billing" },
     });
     expect(deniedResponse.statusCode).toBe(403);
+  });
+
+  it("authenticates via a real OIDC workload identity token instead of a bootstrap token", async () => {
+    const ISSUER = "https://token.actions.githubusercontent.com";
+    const AUDIENCE = "https://control-plane.example.com";
+    const { publicKey, privateKey } = await generateKeyPair("RS256");
+    const oidcConfig = {
+      trustedIssuers: [{ issuer: ISSUER, jwksUrl: "https://example.com/jwks" }],
+      audience: AUDIENCE,
+      keyResolverFactory: () => (async () => publicKey) as unknown as JWTVerifyGetKey,
+    };
+
+    const db = openDatabase(":memory:");
+    const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
+    const oidcStsSend = vi.fn().mockResolvedValue({
+      Credentials: {
+        AccessKeyId: "AKIA_OIDC",
+        SecretAccessKey: "mock-secret-key",
+        SessionToken: "mock-session-token",
+        Expiration: new Date("2026-01-01T00:00:00Z"),
+      },
+    });
+    const oidcApp = buildApp(
+      createContext(db, cipher, {
+        stsClient: { send: oidcStsSend } as unknown as STSClient,
+        describeClientFactory: () => ({ send: vi.fn().mockResolvedValue({}) }),
+        oidcConfig,
+      }),
+    );
+
+    const org = (
+      await oidcApp.inject({ method: "POST", url: "/v1/organizations", payload: { name: "Acme Corp" } })
+    ).json();
+    // No bootstrap token used at all for this identity in this test - it
+    // exists purely to be reached via its OIDC binding below.
+    const identity = (
+      await oidcApp.inject({
+        method: "POST",
+        url: "/v1/service-identities",
+        payload: { orgId: org.id, name: "gha-deploy" },
+      })
+    ).json();
+
+    const bindingResponse = await oidcApp.inject({
+      method: "POST",
+      url: `/v1/service-identities/${identity.id}/oidc-bindings`,
+      payload: { issuer: ISSUER, subjectPattern: "repo:acme/api:ref:refs/heads/main" },
+    });
+    expect(bindingResponse.statusCode).toBe(201);
+
+    const connection = (
+      await oidcApp.inject({
+        method: "POST",
+        url: "/v1/connections",
+        payload: {
+          orgId: org.id,
+          alias: "aws-prod",
+          provider: "aws",
+          credential: { roleArn: "arn:aws:iam::123456789012:role/SecRefsRole", region: "us-east-1" },
+        },
+      })
+    ).json();
+    const role = (
+      await oidcApp.inject({ method: "POST", url: "/v1/roles", payload: { orgId: org.id, name: "gha-deploy" } })
+    ).json();
+    await oidcApp.inject({
+      method: "POST",
+      url: `/v1/roles/${role.id}/bindings`,
+      payload: { serviceIdentityId: identity.id },
+    });
+    await oidcApp.inject({
+      method: "POST",
+      url: `/v1/roles/${role.id}/grants`,
+      payload: { vaultConnectionId: connection.id, pathPattern: "prod/db", maxTtlSeconds: 300 },
+    });
+
+    const matchingToken = await new SignJWT({ sub: "repo:acme/api:ref:refs/heads/main" })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setExpirationTime("5m")
+      .sign(privateKey);
+
+    const mintResponse = await oidcApp.inject({
+      method: "POST",
+      url: "/v1/credentials/mint",
+      headers: { authorization: `Bearer ${matchingToken}` },
+      payload: { alias: "aws-prod", path: "prod/db" },
+    });
+    expect(mintResponse.statusCode).toBe(200);
+    expect(mintResponse.json().credentials.accessKeyId).toBe("AKIA_OIDC");
+
+    // A token whose sub doesn't match any registered binding (a different
+    // branch) is authenticated as *nobody* - 401, not 403 - since it never
+    // resolves to a known principal at all.
+    const wrongBranchToken = await new SignJWT({ sub: "repo:acme/api:ref:refs/heads/feature-x" })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setExpirationTime("5m")
+      .sign(privateKey);
+    const wrongBranchResponse = await oidcApp.inject({
+      method: "POST",
+      url: "/v1/credentials/mint",
+      headers: { authorization: `Bearer ${wrongBranchToken}` },
+      payload: { alias: "aws-prod", path: "prod/db" },
+    });
+    expect(wrongBranchResponse.statusCode).toBe(401);
   });
 
   it("rejects a request with a bootstrap token that belongs to no service identity", async () => {

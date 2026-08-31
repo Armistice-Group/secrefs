@@ -4,7 +4,7 @@ import { resolvePrincipal } from "../auth/principal.js";
 
 export function registerAuditRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get("/v1/audit", async (request, reply) => {
-    const identity = resolvePrincipal(ctx.repo, request.headers.authorization);
+    const identity = await resolvePrincipal(ctx.repo, request.headers.authorization, ctx.oidcConfig);
     if (!identity) {
       return reply.code(401).send({ error: "missing or unrecognized bootstrap token" });
     }

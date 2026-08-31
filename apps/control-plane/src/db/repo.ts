@@ -36,6 +36,13 @@ export interface Grant {
   max_ttl_seconds: number;
 }
 
+export interface OidcBinding {
+  id: string;
+  service_identity_id: string;
+  issuer: string;
+  subject_pattern: string;
+}
+
 /** Thin repository over the schema in `schema.ts`. Every write returns the
  * row it created; every id is a UUIDv4 generated here (not by SQLite) so
  * callers can reference it before the transaction commits. */
@@ -66,6 +73,34 @@ export class ControlPlaneRepo {
     return this.db
       .prepare("SELECT id, org_id, name FROM service_identities WHERE bootstrap_token_hash = ?")
       .get(tokenHash) as ServiceIdentity | undefined;
+  }
+
+  findServiceIdentityById(id: string): ServiceIdentity | undefined {
+    return this.db
+      .prepare("SELECT id, org_id, name FROM service_identities WHERE id = ?")
+      .get(id) as ServiceIdentity | undefined;
+  }
+
+  createOidcBinding(serviceIdentityId: string, issuer: string, subjectPattern: string): OidcBinding {
+    const id = randomUUID();
+    this.db
+      .prepare(
+        "INSERT INTO oidc_bindings (id, service_identity_id, issuer, subject_pattern) VALUES (?, ?, ?, ?)",
+      )
+      .run(id, serviceIdentityId, issuer, subjectPattern);
+    return { id, service_identity_id: serviceIdentityId, issuer, subject_pattern: subjectPattern };
+  }
+
+  /** Every binding registered for a given issuer, across every org - the
+   * candidate set OIDC principal resolution filters by subject-pattern
+   * match (see auth/principal.ts). Small in practice (bindings per issuer,
+   * not per request), and indexed on `issuer`. */
+  findOidcBindingsByIssuer(issuer: string): OidcBinding[] {
+    return this.db
+      .prepare(
+        "SELECT id, service_identity_id, issuer, subject_pattern FROM oidc_bindings WHERE issuer = ?",
+      )
+      .all(issuer) as OidcBinding[];
   }
 
   createVaultConnection(

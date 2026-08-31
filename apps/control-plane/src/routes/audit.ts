@@ -24,7 +24,7 @@ export function registerAuditRoutes(app: FastifyInstance, ctx: AppContext): void
     if (orgId) {
       const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
-      return reply.send({ events: ctx.repo.listAuthorizationEvents(orgId) });
+      return reply.send({ events: await ctx.repo.listAuthorizationEvents(orgId) });
     }
 
     const identity = await resolvePrincipal(ctx.repo, request.headers.authorization, ctx.oidcConfig);
@@ -34,6 +34,6 @@ export function registerAuditRoutes(app: FastifyInstance, ctx: AppContext): void
           "missing or unrecognized bootstrap token - or, if you're an org admin, pass ?orgId= to read that org's log",
       });
     }
-    return reply.send({ events: ctx.repo.listAuthorizationEvents(identity.org_id) });
+    return reply.send({ events: await ctx.repo.listAuthorizationEvents(identity.org_id) });
   });
 }

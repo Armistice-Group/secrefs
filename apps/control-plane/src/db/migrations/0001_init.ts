@@ -8,12 +8,12 @@ import type { Migration } from "./types.js";
  */
 export const migration_0001_init: Migration = {
   id: "0001_init",
-  up: (db) => {
-    db.exec(`
+  up: async (db) => {
+    await db.exec(`
       CREATE TABLE organizations (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
       -- A machine principal (CI runner, prod service) that can request
@@ -26,7 +26,7 @@ export const migration_0001_init: Migration = {
         org_id TEXT NOT NULL REFERENCES organizations(id),
         name TEXT NOT NULL,
         bootstrap_token_hash TEXT NOT NULL UNIQUE,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
       -- One connected vault. \`alias\` is the same alias used in
@@ -41,7 +41,7 @@ export const migration_0001_init: Migration = {
         provider TEXT NOT NULL CHECK (provider IN ('aws', 'bitwarden')),
         alias TEXT NOT NULL,
         encrypted_credential TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (org_id, alias)
       );
 
@@ -81,7 +81,7 @@ export const migration_0001_init: Migration = {
         path TEXT NOT NULL,
         decision TEXT NOT NULL CHECK (decision IN ('allow', 'deny')),
         reason TEXT,
-        requested_at TEXT NOT NULL DEFAULT (datetime('now'))
+        requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
   },

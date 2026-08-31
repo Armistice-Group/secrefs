@@ -27,7 +27,7 @@ describe("AesGcmCipher", () => {
     await expect(other.decrypt(ciphertext)).rejects.toThrow();
   });
 
-  it("rejects a key that isn't exactly 32 bytes", () => {
+  it("rejects a key that isn't exactly 32 bytes", async () => {
     expect(() => new AesGcmCipher(Buffer.from("too-short").toString("base64"))).toThrow(/32 bytes/);
   });
 

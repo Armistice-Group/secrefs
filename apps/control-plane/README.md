@@ -53,6 +53,16 @@ production build described in the design doc. Specifically:
   it now also resolves the exact ARN via one `DescribeSecret` call and
   caches it, so every mint after that is scoped to the precise ARN, not
   the wildcard. See `src/providers/awsSts.ts`.
+- ~~SQLite only~~ **Both, by configuration.** `DATABASE_URL` selects
+  Postgres; without it you get SQLite. Self-hosting stays a single file
+  and `docker compose up` with no database server to run, while a hosted
+  deployment gets RDS's automated backups and point-in-time recovery —
+  which matters because this database holds other orgs' encrypted vault
+  credentials, and losing it means every org re-onboards every
+  connection. One schema, one migration list: the SQL is written in the
+  subset both dialects accept (`CURRENT_TIMESTAMP`, `ON CONFLICT DO
+  NOTHING`), and `src/db/driver.ts` handles the rest. The Postgres path
+  is tested against a real server, not a mock — see Tests below.
 - ~~Management endpoints (connections, roles, grants, service
   identities) had no authentication at all~~ **Fixed, opt-in.** Every
   one of those now requires a WorkOS-authenticated human admin of the
@@ -76,7 +86,9 @@ Or for local iteration: `pnpm --filter @secrefs/control-plane dev` (same
 | Env var | Default | Purpose |
 |---|---|---|
 | `PORT` | `8787` | HTTP port |
-| `SECREFS_CP_DB_PATH` | `./control-plane.sqlite3` | SQLite file (`:memory:` is also valid, but non-persistent) |
+| `DATABASE_URL` | — | Postgres connection string. Set this for a hosted deployment; takes precedence over `SECREFS_CP_DB_PATH`. |
+| `SECREFS_CP_DB_SSL` | `true` | Verify the Postgres server's TLS certificate. Set `false` only for a local container with a self-signed cert — never against RDS. |
+| `SECREFS_CP_DB_PATH` | `./control-plane.sqlite3` | SQLite file, used when `DATABASE_URL` is unset (`:memory:` is valid but non-persistent) |
 | `SECREFS_CP_CIPHER_KEY` | — | Local-dev/self-host cipher key, base64, must decode to exactly 32 bytes — see the generator command above. Required unless `SECREFS_CP_KMS_KEY_ID` is set. |
 | `SECREFS_CP_KMS_KEY_ID` | — | AWS KMS key id/ARN/alias — set this instead of `SECREFS_CP_CIPHER_KEY` to use real KMS envelope encryption. Takes priority if both are set. |
 | `SECREFS_CP_KMS_REGION` | ambient AWS region | Region for the KMS client, only relevant with `SECREFS_CP_KMS_KEY_ID` |
@@ -205,6 +217,24 @@ service-identity/OIDC auth, unchanged.
 ```bash
 pnpm --filter @secrefs/control-plane test
 ```
+
+The Postgres tests are **skipped unless you point them at a real
+server** — a mock would happily pass while the hosted deployment fell
+over on a dialect difference, so they run against actual Postgres or not
+at all:
+
+```bash
+docker run -d --name secrefs-test-pg \
+  -e POSTGRES_PASSWORD=test -e POSTGRES_DB=secrefs_test \
+  -p 55433:5432 postgres:16-alpine
+
+SECREFS_TEST_DATABASE_URL=postgres://postgres:test@localhost:55433/secrefs_test \
+  pnpm --filter @secrefs/control-plane test
+```
+
+That's how the bigint bug in `countVaultConnections` was caught: Postgres
+returns `COUNT(*)` as a string, so the free-tier limit was silently
+comparing against one.
 
 `test/app.e2e.test.ts` drives the full flow above through the real Fastify
 app (in-memory SQLite, a mocked STS client) — connect → grant → mint →

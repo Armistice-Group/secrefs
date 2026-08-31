@@ -17,12 +17,12 @@ export function registerOrganizationRoutes(app: FastifyInstance, ctx: AppContext
       if (!admin) {
         return reply.code(401).send({ error: "missing or unrecognized admin session token" });
       }
-      const org = ctx.repo.createOrganization(name);
-      ctx.repo.createOrgAdmin(org.id, admin.workOsUserId);
+      const org = await ctx.repo.createOrganization(name);
+      await ctx.repo.createOrgAdmin(org.id, admin.workOsUserId);
       return reply.code(201).send(org);
     }
 
-    const org = ctx.repo.createOrganization(name);
+    const org = await ctx.repo.createOrganization(name);
     return reply.code(201).send(org);
   });
 
@@ -36,7 +36,7 @@ export function registerOrganizationRoutes(app: FastifyInstance, ctx: AppContext
     if (!admin) {
       return reply.code(401).send({ error: "missing or unrecognized admin session token" });
     }
-    return reply.send({ organizations: ctx.repo.listOrganizationsForAdmin(admin.workOsUserId) });
+    return reply.send({ organizations: await ctx.repo.listOrganizationsForAdmin(admin.workOsUserId) });
   });
 
   // One org by id. Unlike the list above this works in no-auth mode too,
@@ -48,7 +48,7 @@ export function registerOrganizationRoutes(app: FastifyInstance, ctx: AppContext
     const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
-    const org = ctx.repo.findOrganizationById(orgId);
+    const org = await ctx.repo.findOrganizationById(orgId);
     if (!org) return reply.code(404).send({ error: `no organization "${orgId}"` });
     return reply.send(org);
   });

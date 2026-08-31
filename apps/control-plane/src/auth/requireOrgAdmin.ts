@@ -31,7 +31,7 @@ export async function requireOrgAdmin(
   if (!admin) {
     return { ok: false, status: 401, error: "missing or unrecognized admin session token" };
   }
-  if (!repo.isOrgAdmin(admin.workOsUserId, orgId)) {
+  if (!(await repo.isOrgAdmin(admin.workOsUserId, orgId))) {
     return { ok: false, status: 403, error: "not an admin of this organization" };
   }
   return { ok: true };

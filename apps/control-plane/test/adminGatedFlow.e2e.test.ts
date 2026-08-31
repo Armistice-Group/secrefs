@@ -18,8 +18,8 @@ import { FREE_TIER_CONNECTION_LIMIT } from "../src/db/repo.js";
 describe("control plane - admin-gated management endpoints", () => {
   let app: FastifyInstance;
 
-  beforeEach(() => {
-    const db = openDatabase(":memory:");
+  beforeEach(async () => {
+    const db = await openDatabase();
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
     const workOsConfig: WorkOsAuthConfig = {
       apiKey: "sk_test_unused",
@@ -217,7 +217,7 @@ describe("control plane - admin-gated management endpoints", () => {
 
 describe("control plane - management endpoints with no admin auth configured", () => {
   it("stays open (documented tradeoff) - existing behavior for anyone not opting into WorkOS", async () => {
-    const db = openDatabase(":memory:");
+    const db = await openDatabase();
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
     const app = buildApp(createContext(db, cipher, {})); // no workOsConfig at all
 

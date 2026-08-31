@@ -10,19 +10,19 @@ import {
 } from "../src/providers/awsSts.js";
 
 describe("accountIdFromRoleArn", () => {
-  it("extracts the account id segment", () => {
+  it("extracts the account id segment", async () => {
     expect(accountIdFromRoleArn("arn:aws:iam::123456789012:role/SecRefsControlPlaneRole")).toBe(
       "123456789012",
     );
   });
 
-  it("rejects a non-IAM-role ARN", () => {
+  it("rejects a non-IAM-role ARN", async () => {
     expect(() => accountIdFromRoleArn("arn:aws:s3:::some-bucket")).toThrow(/does not look like/);
   });
 });
 
 describe("secretResourceArn", () => {
-  it("builds a wildcard-suffixed Secrets Manager ARN", () => {
+  it("builds a wildcard-suffixed Secrets Manager ARN", async () => {
     expect(secretResourceArn("us-east-1", "123456789012", "prod/db")).toBe(
       "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db*",
     );
@@ -30,7 +30,7 @@ describe("secretResourceArn", () => {
 });
 
 describe("buildScopedSessionPolicy", () => {
-  it("scopes to exactly the given actions and resource", () => {
+  it("scopes to exactly the given actions and resource", async () => {
     const policy = JSON.parse(
       buildScopedSessionPolicy("arn:aws:secretsmanager:us-east-1:1:secret:x*", ["GetSecretValue"]),
     );
@@ -42,7 +42,7 @@ describe("buildScopedSessionPolicy", () => {
     });
   });
 
-  it("supports multiple actions (the cache-miss case needs DescribeSecret too)", () => {
+  it("supports multiple actions (the cache-miss case needs DescribeSecret too)", async () => {
     const policy = JSON.parse(
       buildScopedSessionPolicy("arn:...", ["GetSecretValue", "DescribeSecret"]),
     );

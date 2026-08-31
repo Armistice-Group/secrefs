@@ -25,8 +25,8 @@ describe("admin read paths", () => {
     },
   };
 
-  function buildAuthedApp() {
-    const db = openDatabase(":memory:");
+  async function buildAuthedApp() {
+    const db = await openDatabase();
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
     return buildApp(createContext(db, cipher, { workOsConfig }));
   }
@@ -35,8 +35,8 @@ describe("admin read paths", () => {
 
   describe("GET /v1/organizations/:orgId", () => {
     let app: FastifyInstance;
-    beforeEach(() => {
-      app = buildAuthedApp();
+    beforeEach(async () => {
+      app = await buildAuthedApp();
     });
 
     it("returns the org for an admin of it", async () => {
@@ -92,7 +92,7 @@ describe("admin read paths", () => {
 
   describe("GET /v1/audit", () => {
     it("lets an org admin read their org's log via ?orgId=", async () => {
-      const app = buildAuthedApp();
+      const app = await buildAuthedApp();
       const org = (
         await app.inject({
           method: "POST",
@@ -113,7 +113,7 @@ describe("admin read paths", () => {
     });
 
     it("403s an admin reading an org they don't administer", async () => {
-      const app = buildAuthedApp();
+      const app = await buildAuthedApp();
       const org = (
         await app.inject({
           method: "POST",
@@ -134,7 +134,7 @@ describe("admin read paths", () => {
     it("still serves a service identity with no orgId, scoped to its own org", async () => {
       // No WorkOS configured here - the original machine-token path has
       // to keep working exactly as before on a self-hosted control plane.
-      const db = openDatabase(":memory:");
+      const db = await openDatabase();
       const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
       const app = buildApp(
         createContext(db, cipher, {
@@ -164,7 +164,7 @@ describe("admin read paths", () => {
     });
 
     it("401s an unauthenticated caller with no orgId, and says how an admin should ask", async () => {
-      const app = buildAuthedApp();
+      const app = await buildAuthedApp();
       const response = await app.inject({ method: "GET", url: "/v1/audit" });
 
       expect(response.statusCode).toBe(401);

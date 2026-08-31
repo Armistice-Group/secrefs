@@ -19,7 +19,7 @@ describe("control plane end-to-end", () => {
   let app: FastifyInstance;
   let stsSend: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     stsSend = vi.fn().mockResolvedValue({
       Credentials: {
         AccessKeyId: "AKIA_MOCK",
@@ -29,7 +29,7 @@ describe("control plane end-to-end", () => {
       },
     });
     const fakeStsClient = { send: stsSend } as unknown as STSClient;
-    const db = openDatabase(":memory:");
+    const db = await openDatabase();
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
     // Keeps ARN resolution (a DescribeSecret call through the freshly
     // minted credentials) fully offline - no test here cares about exact-
@@ -215,7 +215,7 @@ describe("control plane end-to-end", () => {
       keyResolverFactory: () => (async () => publicKey) as unknown as JWTVerifyGetKey,
     };
 
-    const db = openDatabase(":memory:");
+    const db = await openDatabase();
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
     const oidcStsSend = vi.fn().mockResolvedValue({
       Credentials: {

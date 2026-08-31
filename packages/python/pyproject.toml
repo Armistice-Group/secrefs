@@ -13,6 +13,16 @@ packages = [{ include = "secrefs" }]
 python = "^3.10"
 boto3 = "^1.34"
 hvac = "^2.1"
+# Optional, unlike boto3/hvac: bitwarden-sdk publishes only prebuilt native
+# wheels for a fixed set of platform tags with no source distribution, so a
+# hard dependency would break installing secrefs at all on any platform
+# Bitwarden doesn't build for - including for the many users who never write
+# a sec://bitwarden/... reference. providers/bitwarden.py imports it at
+# first use and explains how to install it if it's absent.
+bitwarden-sdk = { version = "^2.1", optional = true }
+
+[tool.poetry.extras]
+bitwarden = ["bitwarden-sdk"]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2"
@@ -31,12 +41,14 @@ python_version = "3.10"
 warn_unused_configs = true
 strict = true
 
-# boto3/hvac ship without inline type stubs (py.typed) or a matching
-# stub-only package pinned in this project; suppress the import warning
-# for just these two rather than pulling in a heavy generated-stub
+# boto3/hvac/bitwarden_sdk ship without inline type stubs (py.typed) or a
+# matching stub-only package pinned in this project; suppress the import
+# warning for just these rather than pulling in a heavy generated-stub
 # dependency (e.g. boto3-stubs) not called for in the project spec.
+# bitwarden_sdk is additionally an optional extra, so it may legitimately
+# not be installed in the environment mypy runs in.
 [[tool.mypy.overrides]]
-module = ["boto3.*", "hvac.*"]
+module = ["boto3.*", "hvac.*", "bitwarden_sdk.*"]
 ignore_missing_imports = true
 
 [build-system]

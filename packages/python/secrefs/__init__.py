@@ -1,6 +1,14 @@
 import os
 from typing import Dict, List, Optional
 
+from .control_plane_client import (
+    ControlPlaneClient,
+    ControlPlaneCredentialSource,
+    ControlPlaneRequestError,
+    MintCredentialResponse,
+    MintedAWSCredentials,
+    MintedBitwardenCredentials,
+)
 from .parser import (
     ParsedSecretRef,
     SecRefParseError,
@@ -10,6 +18,7 @@ from .parser import (
 )
 from .providers.aws import AWSSecretsManagerProvider
 from .providers.base import ProviderHealth, SecretFetchError, SecretFetchRequest, SecretProvider
+from .providers.bitwarden import BitwardenProvider
 from .providers.local import LocalProvider
 from .providers.vault import VaultProvider
 from .resolver import (
@@ -21,14 +30,16 @@ from .resolver import (
     expand_environ,
     expand_key_value_map,
 )
+from .ttl_cache import TtlCache
 
 
 def create_default_providers() -> Dict[str, SecretProvider]:
-    """Builds the default provider registry: aws, vault, local."""
+    """Builds the default provider registry: aws, vault, local, bitwarden."""
     return {
         "aws": AWSSecretsManagerProvider(),
         "vault": VaultProvider(),
         "local": LocalProvider(),
+        "bitwarden": BitwardenProvider(),
     }
 
 
@@ -77,10 +88,18 @@ __all__ = [
     "AWSSecretsManagerProvider",
     "VaultProvider",
     "LocalProvider",
+    "BitwardenProvider",
     "SecretProvider",
     "SecretFetchRequest",
     "SecretFetchError",
     "ProviderHealth",
+    "TtlCache",
+    "ControlPlaneClient",
+    "ControlPlaneCredentialSource",
+    "ControlPlaneRequestError",
+    "MintCredentialResponse",
+    "MintedAWSCredentials",
+    "MintedBitwardenCredentials",
     "SecRefsResolutionError",
     "ResolutionFailure",
     "CheckResult",

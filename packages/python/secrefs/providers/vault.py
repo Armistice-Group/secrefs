@@ -8,6 +8,9 @@ hvac is synchronous, so calls are offloaded to a thread via
 `asyncio.to_thread`. The client is constructed lazily on first use so that
 simply having a VaultProvider in your registry doesn't require Vault to be
 configured if you never reference sec://vault/... at all.
+
+Read secrets are re-read on every expansion by default; see `cache_ttl_ms`
+and ../ttl_cache.py for why that default is what it is.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from typing import Any, Dict, Optional, cast
 
 import hvac
 
+from ..ttl_cache import TtlCache
 from .base import ProviderHealth, SecretFetchRequest, SecretProvider, extract_field
 
 
@@ -30,12 +34,16 @@ class VaultProvider(SecretProvider):
         url: Optional[str] = None,
         token: Optional[str] = None,
         client: Optional[Any] = None,
+        cache_ttl_ms: float = 0.0,
     ) -> None:
+        """`cache_ttl_ms` is how long a read secret may be reused; it
+        defaults to 0, meaning every expansion re-reads, so rotation reaches
+        a long-running consumer without a redeploy."""
         self._explicit_client = client
         self._url = url or os.environ.get("VAULT_ADDR")
         self._token = token or os.environ.get("VAULT_TOKEN")
         self._client_instance: Optional[Any] = None
-        self._data_cache: Dict[str, "asyncio.Task[Dict[str, Any]]"] = {}
+        self._data_cache: TtlCache[Dict[str, Any]] = TtlCache(ttl_ms=cache_ttl_ms)
 
     def _get_client(self) -> Any:
         if self._explicit_client is not None:
@@ -51,19 +59,14 @@ class VaultProvider(SecretProvider):
         self._client_instance = hvac.Client(url=self._url, token=self._token)
         return self._client_instance
 
-    def _get_data(self, path: str) -> "asyncio.Task[Dict[str, Any]]":
-        task = self._data_cache.get(path)
-        if task is None:
-            task = asyncio.ensure_future(self._fetch_data(path))
-            self._data_cache[path] = task
-        return task
-
     async def _fetch_data(self, path: str) -> Dict[str, Any]:
+        # Outside the try: an unconfigured VAULT_ADDR/VAULT_TOKEN is a
+        # misconfiguration, not a failed read, and shouldn't be reported as
+        # one.
         client = self._get_client()
         try:
             response = await asyncio.to_thread(client.read, path)
         except Exception as exc:  # noqa: BLE001
-            self._data_cache.pop(path, None)
             raise ValueError(f'could not read Vault path "{path}": {exc}') from exc
 
         if response is None or "data" not in response:
@@ -77,7 +80,7 @@ class VaultProvider(SecretProvider):
         return cast(Dict[str, Any], outer)
 
     async def fetch_one(self, request: SecretFetchRequest) -> str:
-        data = await self._get_data(request.path)
+        data = await self._data_cache.fetch(request.path, lambda: self._fetch_data(request.path))
 
         if not request.field:
             if len(data) == 1:

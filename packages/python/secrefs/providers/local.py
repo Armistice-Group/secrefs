@@ -21,14 +21,26 @@ DEFAULT_FILENAME = ".secrefs.local.json"
 class LocalProvider(SecretProvider):
     name = "local"
 
-    def __init__(self, file_path: Optional[Union[str, Path]] = None) -> None:
+    def __init__(
+        self,
+        file_path: Optional[Union[str, Path]] = None,
+        cache_file: bool = False,
+    ) -> None:
+        """`cache_file` keeps the parsed file in memory instead of re-reading
+        it per fetch. Off by default so an edit takes effect immediately -
+        caching it meant editing .secrefs.local.json mid-session silently did
+        nothing, which is the local-development shape of the same
+        stale-secret problem ../ttl_cache.py exists to solve."""
         self._file_path = Path(
             file_path or os.environ.get("SECREFS_LOCAL_FILE") or (Path.cwd() / DEFAULT_FILENAME)
         )
+        self._cache_file = cache_file
         self._cache: Optional[Dict[str, Any]] = None
 
     def _load(self) -> Dict[str, Any]:
-        if self._cache is not None:
+        # The file is local and tiny, so re-reading it costs nothing worth
+        # trading an edit-takes-effect guarantee for.
+        if self._cache is not None and self._cache_file:
             return self._cache
 
         try:

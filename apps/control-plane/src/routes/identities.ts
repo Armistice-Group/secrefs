@@ -17,4 +17,23 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       return reply.code(201).send({ ...identity, bootstrapToken: token });
     },
   );
+
+  // Trusts a CI job's own OIDC identity token instead of a bootstrap
+  // token (docs §9) - see auth/oidc.ts and auth/principal.ts for how a
+  // request is actually authenticated against these afterward.
+  app.post<{ Params: { id: string }; Body: { issuer: string; subjectPattern: string } }>(
+    "/v1/service-identities/:id/oidc-bindings",
+    async (request, reply) => {
+      const { issuer, subjectPattern } = request.body ?? {};
+      if (!issuer || !subjectPattern) {
+        return reply.code(400).send({ error: "issuer and subjectPattern are required" });
+      }
+      const identity = ctx.repo.findServiceIdentityById(request.params.id);
+      if (!identity) {
+        return reply.code(404).send({ error: `no service identity "${request.params.id}"` });
+      }
+      const binding = ctx.repo.createOidcBinding(identity.id, issuer, subjectPattern);
+      return reply.code(201).send(binding);
+    },
+  );
 }

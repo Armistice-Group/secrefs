@@ -22,20 +22,37 @@ org's one stored token as-is, not freshly re-scoped to your request. See
 This is a working scaffold that proves the model end-to-end, not the
 production build described in the design doc. Specifically:
 
-- **Credential custody** uses a single static AES-256-GCM key from an env
-  var (`src/crypto/cipher.ts`), not the per-org, KMS-wrapped envelope
-  encryption the design doc specifies for production (§4). Swap in a
-  `CredentialCipher` implementation backed by a real KMS before this ever
-  holds a real org's credentials.
-- **Auth is bootstrap-token only** (`src/auth/principal.ts`) — workload
-  identity federation (GitHub/GitLab OIDC, the preferred mode per §9)
-  isn't implemented yet.
-- **No database migrations** — `src/db/schema.ts` is applied idempotently
-  on boot. Fine for a single-version scaffold; revisit before there are
-  multiple deployed schema versions to reconcile.
-- **Secrets Manager ARNs are wildcard-suffixed** (`secretResourceArn` in
-  `src/providers/awsSts.ts`) rather than resolved to the exact ARN AWS
-  assigned — noted as a known simplification there.
+- ~~Credential custody is a single static key~~ **Fixed, but opt-in.**
+  `KmsEnvelopeCipher` (`src/crypto/kmsCipher.ts`) implements the real
+  per-credential envelope encryption design doc §4 specifies — a fresh
+  AES-256 data key per `encrypt()` call via AWS KMS `GenerateDataKey`,
+  wrapped under your own KMS key, org-bound via KMS `EncryptionContext`
+  (decrypting with the wrong org fails at the KMS API itself). Set
+  `SECREFS_CP_KMS_KEY_ID` to use it; the static-key `AesGcmCipher`
+  (`src/crypto/cipher.ts`) is still there and still a legitimate choice
+  for a self-hoster whose own infra's disk encryption is their trust
+  boundary — see `src/crypto/selectCipher.ts` for exactly how the choice
+  is made.
+- ~~Auth is bootstrap-token only~~ **Fixed, additive.** Workload identity
+  federation (docs §9) is real now — `src/auth/oidc.ts` verifies a CI
+  job's own OIDC ID token against a pinned issuer + JWKS (never discovered
+  from the token's own claims — see that file's docstring for why), and
+  `src/auth/principal.ts` matches its `sub` claim against registered
+  `oidc_bindings`. Presets for GitHub Actions and GitLab CI, plus a
+  generic escape hatch for any other OIDC issuer — see the env vars
+  below. Bootstrap tokens are still fully supported and remain the
+  fallback for platforms with no OIDC issuer to federate against.
+- ~~No database migrations~~ **Fixed.** `src/db/migrations/` is a real,
+  ordered, transactional migration framework (`src/db/migrate.ts`) with a
+  one-time compatibility shim (`adoptPreMigrationSchema` in
+  `src/db/client.ts`) for anyone who already deployed the pre-migration
+  scaffold — verified against a real on-disk file created the old way.
+- ~~Secrets Manager ARNs are wildcard-suffixed~~ **Improved, not fully
+  fixed.** The *first* mint for a given secret is still wildcard-scoped
+  (unavoidable — AWS's random ARN suffix isn't knowable in advance), but
+  it now also resolves the exact ARN via one `DescribeSecret` call and
+  caches it, so every mint after that is scoped to the precise ARN, not
+  the wildcard. See `src/providers/awsSts.ts`.
 
 ## Run it locally (no Docker)
 
@@ -52,7 +69,13 @@ Or for local iteration: `pnpm --filter @secrefs/control-plane dev` (same
 |---|---|---|
 | `PORT` | `8787` | HTTP port |
 | `SECREFS_CP_DB_PATH` | `./control-plane.sqlite3` | SQLite file (`:memory:` is also valid, but non-persistent) |
-| `SECREFS_CP_CIPHER_KEY` | *(required)* | Base64, must decode to exactly 32 bytes — see the generator command above |
+| `SECREFS_CP_CIPHER_KEY` | — | Local-dev/self-host cipher key, base64, must decode to exactly 32 bytes — see the generator command above. Required unless `SECREFS_CP_KMS_KEY_ID` is set. |
+| `SECREFS_CP_KMS_KEY_ID` | — | AWS KMS key id/ARN/alias — set this instead of `SECREFS_CP_CIPHER_KEY` to use real KMS envelope encryption. Takes priority if both are set. |
+| `SECREFS_CP_KMS_REGION` | ambient AWS region | Region for the KMS client, only relevant with `SECREFS_CP_KMS_KEY_ID` |
+| `SECREFS_CP_OIDC_GITHUB_ACTIONS` | — | Set to `true` to trust GitHub Actions' own OIDC issuer |
+| `SECREFS_CP_OIDC_GITLAB` | — | Set to `true` for gitlab.com, or a self-managed instance's base URL |
+| `SECREFS_CP_TRUSTED_OIDC_ISSUERS` | — | JSON `{issuer, jwksUrl}[]` — the generic/configurable path for any other OIDC issuer |
+| `SECREFS_CP_OIDC_AUDIENCE` | — | Required if any OIDC issuer above is configured — the `aud` claim every trusted token must carry |
 
 ## Self-hosting
 
@@ -116,11 +139,12 @@ Specifically, as the operator, you now own:
 |---|---|
 | `POST /v1/organizations` | Create an org |
 | `POST /v1/service-identities` | Create a machine principal; response includes the bootstrap token **once** |
+| `POST /v1/service-identities/:id/oidc-bindings` | Trust a CI job's OIDC identity instead of (or alongside) a bootstrap token — `{ issuer, subjectPattern }`, `subjectPattern` matched against the token's `sub` claim with the same glob-lite rules as `Grant.path_pattern` |
 | `POST /v1/connections` | Connect a vault — `provider: "aws"` + `credential: { roleArn, region, externalId? }`, or `provider: "bitwarden"` + `credential: { accessToken, organizationId? }` |
 | `POST /v1/roles` | Create a role |
 | `POST /v1/roles/:roleId/bindings` | Bind a service identity to a role |
 | `POST /v1/roles/:roleId/grants` | Grant a role access to a connection, scoped to a `pathPattern` (see `src/rbac/match.ts`) |
-| `POST /v1/credentials/mint` | `Authorization: Bearer <bootstrap token>` + `{ alias, path }` → a resolved credential (freshly scoped for AWS, distributed as-is for Bitwarden — see above), or a `403` with why not |
+| `POST /v1/credentials/mint` | `Authorization: Bearer <bootstrap token OR verified OIDC token>` + `{ alias, path }` → a resolved credential (freshly scoped for AWS, distributed as-is for Bitwarden — see above), or a `403` with why not |
 | `GET /v1/audit` | This org's `AuthorizationEvent` log |
 
 ## Tests

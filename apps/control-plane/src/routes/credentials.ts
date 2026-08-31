@@ -24,14 +24,18 @@ async function resolveCredential(
   path: string,
   ttlSeconds: number,
 ): Promise<{ provider: string; credentials: unknown }> {
-  const raw = JSON.parse(ctx.cipher.decrypt(connection.encrypted_credential)) as unknown;
+  const decrypted = await ctx.cipher.decrypt(connection.encrypted_credential, { orgId: connection.org_id });
+  const raw = JSON.parse(decrypted) as unknown;
 
   if (connection.provider === "aws") {
     const credentials = await mintAwsCredential({
       credential: raw as AwsMasterCredential,
       path,
       durationSeconds: ttlSeconds,
+      connectionKey: connection.id,
+      arnCache: ctx.arnCache,
       client: ctx.stsClient,
+      describeClientFactory: ctx.describeClientFactory,
     });
     return { provider: "aws", credentials };
   }
@@ -49,7 +53,7 @@ async function resolveCredential(
  */
 export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.post<{ Body: MintBody }>("/v1/credentials/mint", async (request, reply) => {
-    const identity = resolvePrincipal(ctx.repo, request.headers.authorization);
+    const identity = await resolvePrincipal(ctx.repo, request.headers.authorization, ctx.oidcConfig);
     if (!identity) {
       return reply.code(401).send({ error: "missing or unrecognized bootstrap token" });
     }

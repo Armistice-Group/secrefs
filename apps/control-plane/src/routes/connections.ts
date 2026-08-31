@@ -41,7 +41,7 @@ export function registerConnectionRoutes(app: FastifyInstance, ctx: AppContext):
       });
     }
 
-    const encrypted = ctx.cipher.encrypt(JSON.stringify(credential));
+    const encrypted = await ctx.cipher.encrypt(JSON.stringify(credential), { orgId });
     const connection = ctx.repo.createVaultConnection(orgId, provider, alias, encrypted);
 
     // Never echo the credential back, encrypted or not.

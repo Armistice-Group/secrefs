@@ -22,7 +22,8 @@ sec://local/mock-db#password
 | `packages/python` | Python SDK + `secrefs-py` CLI, API parity with the Node engine |
 | `apps/web` | secrefs.com marketing site + interactive in-browser sandbox |
 | `apps/web/infra` | AWS CDK stack (Route 53 + ACM + S3 + CloudFront) that hosts the site |
-| `apps/control-plane` | Org vault connections + RBAC + scoped credential minting (v1: AWS only). See [`docs/control-plane-design.md`](docs/control-plane-design.md). |
+| `apps/control-plane` | Org vault connections + RBAC + scoped credential minting (AWS + Bitwarden). See [`docs/control-plane-design.md`](docs/control-plane-design.md). |
+| `apps/control-plane-admin` | Admin console for the control plane — works against a hosted or self-hosted instance |
 
 ## Quickstart (Node)
 

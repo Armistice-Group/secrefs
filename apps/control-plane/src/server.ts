@@ -43,9 +43,18 @@ if (!workOsConfig) {
   );
 }
 
+// Comma-separated origins the admin console is served from, e.g.
+// "http://localhost:3001" locally or "https://admin.example.com" in a
+// real deployment. Unset means no CORS headers at all - correct unless
+// you're actually running the console. See app.ts's BuildAppOptions.
+const corsOrigins = (process.env.SECREFS_CP_CORS_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 const db = openDatabase(DB_PATH);
 const ctx = createContext(db, cipher, { oidcConfig, workOsConfig });
-const app = buildApp(ctx);
+const app = buildApp(ctx, { corsOrigins });
 
 app
   .listen({ port: PORT, host: "0.0.0.0" })
@@ -54,7 +63,10 @@ app
       ? `, OIDC issuers: ${oidcConfig.trustedIssuers.map((t) => t.issuer).join(", ")}`
       : ", OIDC: not configured (bootstrap tokens only)";
     const adminNote = workOsConfig ? ", admin auth: WorkOS" : ", admin auth: NONE (see warning above)";
-    console.log(`secrefs control plane listening on :${PORT} (db: ${DB_PATH}${oidcNote}${adminNote})`);
+    const corsNote = corsOrigins.length ? `, CORS: ${corsOrigins.join(", ")}` : "";
+    console.log(
+      `secrefs control plane listening on :${PORT} (db: ${DB_PATH}${oidcNote}${adminNote}${corsNote})`,
+    );
   })
   .catch((err) => {
     console.error(err);

@@ -234,10 +234,14 @@ on `AwsSecretsManagerProvider`/`VaultProvider` don't need to change at all.
 ## 10. Repo layout
 
 ```
-apps/control-plane/   -- a standalone Fastify service (not Next.js API
-                          routes) - no admin console UI yet (§11 - that's
-                          v2). Dockerfile + docker-compose.yml included;
-                          self-hostable today (see its README).
+apps/control-plane/        -- a standalone Fastify service (not Next.js
+                              API routes). Dockerfile + docker-compose.yml
+                              included; self-hostable today.
+apps/control-plane-admin/  -- the admin console (§11's v2 UI). A separate
+                              statically-exported Next.js app rather than
+                              routes inside the service above, so
+                              self-hosting it is "serve this directory"
+                              with no second Node process.
 ```
 
 **Built, and not a separate package after all.** The
@@ -269,7 +273,11 @@ provider itself.
   KMS/workload-identity production versions of those two pieces.
 - **v2:** 1Password + Bitwarden + GCP Secret Manager connections. Admin
   console (the piece that actually needs a UI — connection setup, role
-  management, audit view).
+  management, audit view). **Status: console built**
+  (`apps/control-plane-admin`) — connections, roles/grants, service
+  identities, audit log, working against both a WorkOS-configured and a
+  no-auth control plane. WorkOS *redirect* sign-in isn't wired yet (see
+  that app's README); Bitwarden connections shipped early, in v1.
 - **v3:** Self-hosted connector option (§4) for orgs that want the master
   token to never leave their infra at all.
 - **Dashlane:** not slotted into a version — genuinely unresolved whether

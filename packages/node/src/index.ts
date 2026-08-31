@@ -40,6 +40,16 @@ export {
 } from "./providers/bitwarden.js";
 
 export {
+  ControlPlaneClient,
+  ControlPlaneRequestError,
+  type ControlPlaneClientOptions,
+  type ControlPlaneCredentialSource,
+  type MintCredentialResponse,
+  type MintedAwsCredentials,
+  type MintedBitwardenCredentials,
+} from "./controlPlaneClient.js";
+
+export {
   expandKeyValueMap,
   expandProcessEnv,
   checkReferences,

@@ -240,13 +240,22 @@ apps/control-plane/   -- a standalone Fastify service (not Next.js API
                           self-hostable today (see its README).
 ```
 
-The `packages/control-plane-client/` idea (a thin client the Node/Python
-SDKs call to source credentials from a running control plane instead of
-purely ambient env vars) is still unbuilt - today's SDK providers only
-know ambient auth. That's the piece that would make a `secrefs run`
-against `sec://aws-prod/...` actually go through the control plane rather
-than requiring the org to hand-place a minted credential into the
-environment themselves.
+**Built, and not a separate package after all.** The
+`packages/control-plane-client/` idea became `packages/node/src/controlPlaneClient.ts`
+- a thin HTTP client, plus a `controlPlane` constructor option on
+`AwsSecretsManagerProvider` and `BitwardenProvider` that sources
+per-request credentials from a running control plane instead of ambient
+env vars. Living inside `@secrefs/node` rather than its own package kept
+this from needing a new workspace member for what turned out to be ~150
+lines - revisit only if a second consumer (the Python SDK, say) needs it
+badly enough to justify sharing the client across packages. Verified live
+against a real running control plane for both providers: AWS reaches the
+real `sts:AssumeRole` boundary (correctly fails without a real trust
+relationship, exactly like every other AWS smoke test in this doc's
+history); Bitwarden's distributed token round-trips exactly as stored,
+and an out-of-scope path is correctly denied with the RBAC reason intact.
+Python parity not done - same fast-follow status as the Bitwarden SDK
+provider itself.
 
 ## 11. Phased rollout
 

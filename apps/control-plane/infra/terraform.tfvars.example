@@ -12,8 +12,9 @@ api_domain = "api.secrefs.com"
 # fall back to the static SECREFS_CP_CIPHER_KEY out of Secrets Manager.
 # enable_kms_cipher = true
 
-# ~$33/mo. Required for WorkOS admin auth, Bitwarden connections, and OIDC
-# JWKS fetches — see variables.tf.
+# ~$33/mo. Required for the RDS CA bundle at boot, WorkOS admin auth, and
+# OIDC JWKS fetches — see variables.tf. (Bitwarden connections need no
+# outbound call; the control plane returns the stored token.)
 # enable_nat_gateway = true
 
 # ~$66/mo for nine interface endpoints. Keeps Secrets Manager / KMS / STS

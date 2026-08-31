@@ -70,6 +70,17 @@ If a future backend genuinely can't support delegation, the honest move is
 a clearly-labeled opt-in "proxy mode" for that backend specifically, not
 quietly weakening the guarantee for everyone.
 
+**Revisited (2026-08-31).** The trigger turned out not to be a backend
+that can't delegate — it's a *use case* that can't. Third-party
+pass-through (a vendor holding a customer's `sec://` reference and
+expanding it at runtime) cannot work through the broker, because
+"a credential the vault accepts" is always a larger grant than "the value
+of this one secret," and that gap is exactly what you can't hand a
+vendor. Since pass-through is the product's central value proposition,
+proxy mode is required rather than hypothetical. The recommendation above
+still stands for first-party infrastructure, which remains the default.
+See [`proxy-mode-design.md`](./proxy-mode-design.md).
+
 ## 4. Master credential custody
 
 Separately: where does the org's *master* vault credential — the AWS role

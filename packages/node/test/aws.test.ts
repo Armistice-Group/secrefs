@@ -16,12 +16,52 @@ describe("AwsSecretsManagerProvider - ambient mode", () => {
     expect(await provider.fetchOne({ path: "prod/db", field: "password" })).toBe("hunter2");
   });
 
-  it("caches the raw secret across multiple #field requests against the same path", async () => {
-    const { client, send } = fakeSecretsManagerClient(JSON.stringify({ a: "1", b: "2" }));
+  it("re-fetches on every expansion by default, so a rotated secret reaches a running process", async () => {
+    const { client, send } = fakeSecretsManagerClient(JSON.stringify({ a: "1" }));
     const provider = new AwsSecretsManagerProvider({ client });
 
     await provider.fetchOne({ path: "prod/db", field: "a" });
-    await provider.fetchOne({ path: "prod/db", field: "b" });
+    await provider.fetchOne({ path: "prod/db", field: "a" });
+
+    // The whole point of a sec:// reference is that the value behind it
+    // can change. Caching by default would mean a long-running consumer
+    // held the pre-rotation value until it restarted.
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("actually returns the new value after the source rotates", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ SecretString: JSON.stringify({ password: "old" }) })
+      .mockResolvedValueOnce({ SecretString: JSON.stringify({ password: "rotated" }) });
+    const provider = new AwsSecretsManagerProvider({
+      client: { send } as unknown as SecretsManagerClient,
+    });
+
+    expect(await provider.fetchOne({ path: "prod/db", field: "password" })).toBe("old");
+    expect(await provider.fetchOne({ path: "prod/db", field: "password" })).toBe("rotated");
+  });
+
+  it("coalesces concurrent expansions of the same reference into one request", async () => {
+    const { client, send } = fakeSecretsManagerClient(JSON.stringify({ a: "1", b: "2" }));
+    const provider = new AwsSecretsManagerProvider({ client });
+
+    // Sharing an in-flight request is not the same as caching its result:
+    // nothing is held past the moment it settles.
+    await Promise.all([
+      provider.fetchOne({ path: "prod/db", field: "a" }),
+      provider.fetchOne({ path: "prod/db", field: "b" }),
+    ]);
+
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses a value within an explicit cacheTtlMs window", async () => {
+    const { client, send } = fakeSecretsManagerClient(JSON.stringify({ a: "1" }));
+    const provider = new AwsSecretsManagerProvider({ client, cacheTtlMs: 60_000 });
+
+    await provider.fetchOne({ path: "prod/db", field: "a" });
+    await provider.fetchOne({ path: "prod/db", field: "a" });
 
     expect(send).toHaveBeenCalledTimes(1);
   });

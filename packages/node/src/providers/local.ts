@@ -12,6 +12,9 @@ const DEFAULT_FILENAME = ".secrefs.local.json";
 export interface LocalProviderOptions {
   /** Overrides the file path. Defaults to $SECREFS_LOCAL_FILE or ./.secrefs.local.json */
   filePath?: string;
+  /** Keep the parsed file in memory instead of re-reading per fetch.
+   * Off by default so edits take effect immediately. */
+  cacheFile?: boolean;
 }
 
 /**
@@ -30,7 +33,10 @@ export class LocalProvider extends BaseSecretProvider {
   readonly name = "local";
 
   private readonly filePath: string;
+  /** Re-read on every fetch. The file is local and tiny, and caching
+   * it meant editing it mid-session silently did nothing. */
   private cache: Record<string, unknown> | null = null;
+  private readonly cacheFile: boolean;
 
   constructor(options: LocalProviderOptions = {}) {
     super();
@@ -38,10 +44,11 @@ export class LocalProvider extends BaseSecretProvider {
       options.filePath ??
       process.env.SECREFS_LOCAL_FILE ??
       path.join(process.cwd(), DEFAULT_FILENAME);
+    this.cacheFile = options.cacheFile ?? false;
   }
 
   private async load(): Promise<Record<string, unknown>> {
-    if (this.cache) return this.cache;
+    if (this.cache && this.cacheFile) return this.cache;
 
     let raw: string;
     try {

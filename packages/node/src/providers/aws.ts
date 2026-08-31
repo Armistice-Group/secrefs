@@ -10,6 +10,7 @@ import {
   type ProviderHealth,
   type SecretFetchRequest,
 } from "./base.js";
+import { TtlCache } from "../ttlCache.js";
 import {
   ControlPlaneClient,
   ControlPlaneRequestError,
@@ -35,6 +36,14 @@ export interface AwsProviderOptions {
    * both are given, for testing).
    */
   controlPlane?: ControlPlaneCredentialSource;
+  /**
+   * How long a fetched secret value may be reused, in milliseconds.
+   * Defaults to 0 - every expansion re-fetches, so a rotated secret
+   * reaches a long-running consumer without a redeploy. Raise it to
+   * trade a bounded window of staleness for fewer round trips. See
+   * ../ttlCache.ts.
+   */
+  cacheTtlMs?: number;
 }
 
 /**
@@ -64,13 +73,14 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
   private readonly controlPlane?: ControlPlaneCredentialSource;
   private readonly controlPlaneClient?: ControlPlaneClient;
   private ambientClient: SecretsManagerClient | null = null;
-  private readonly rawCache = new Map<string, Promise<string>>();
+  private readonly rawCache: TtlCache<string>;
 
   constructor(options: AwsProviderOptions = {}) {
     super();
     this.explicitClient = options.client;
     this.region = options.region;
     this.controlPlane = options.controlPlane;
+    this.rawCache = new TtlCache<string>({ ttlMs: options.cacheTtlMs });
     if (this.controlPlane) {
       this.controlPlaneClient =
         this.controlPlane.client ??
@@ -111,12 +121,10 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
   }
 
   private getRaw(path: string): Promise<string> {
-    const cached = this.rawCache.get(path);
-    if (cached) return cached;
-
-    const pending = this.clientFor(path)
-      .then((client) => client.send(new GetSecretValueCommand({ SecretId: path })))
-      .then((response) => {
+    return this.rawCache.fetch(path, async () => {
+      try {
+        const client = await this.clientFor(path);
+        const response = await client.send(new GetSecretValueCommand({ SecretId: path }));
         if (typeof response.SecretString === "string") {
           return response.SecretString;
         }
@@ -124,14 +132,10 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
           return Buffer.from(response.SecretBinary as Uint8Array).toString("utf8");
         }
         throw new Error(`secret "${path}" has no SecretString or SecretBinary payload`);
-      })
-      .catch((err: unknown) => {
-        this.rawCache.delete(path);
+      } catch (err) {
         throw new Error(`could not fetch secret "${path}": ${errorMessage(err)}`);
-      });
-
-    this.rawCache.set(path, pending);
-    return pending;
+      }
+    });
   }
 
   async fetchOne(request: SecretFetchRequest): Promise<string> {

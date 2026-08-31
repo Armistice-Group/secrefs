@@ -12,7 +12,7 @@ export interface Organization {
 export interface OrgAdmin {
   id: string;
   org_id: string;
-  clerk_user_id: string;
+  workos_user_id: string;
   email: string | null;
 }
 
@@ -78,40 +78,40 @@ export class ControlPlaneRepo {
       | undefined;
   }
 
-  /** Registers `clerkUserId` as an admin of `orgId` - idempotent, so
+  /** Registers `workOsUserId` as an admin of `orgId` - idempotent, so
    * calling it again for the same pair is a no-op rather than an error. */
-  createOrgAdmin(orgId: string, clerkUserId: string, email?: string): OrgAdmin {
+  createOrgAdmin(orgId: string, workOsUserId: string, email?: string): OrgAdmin {
     const id = randomUUID();
     this.db
       .prepare(
-        "INSERT OR IGNORE INTO org_admins (id, org_id, clerk_user_id, email) VALUES (?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO org_admins (id, org_id, workos_user_id, email) VALUES (?, ?, ?, ?)",
       )
-      .run(id, orgId, clerkUserId, email ?? null);
+      .run(id, orgId, workOsUserId, email ?? null);
     return (
       (this.db
-        .prepare("SELECT id, org_id, clerk_user_id, email FROM org_admins WHERE org_id = ? AND clerk_user_id = ?")
-        .get(orgId, clerkUserId) as OrgAdmin | undefined) ?? { id, org_id: orgId, clerk_user_id: clerkUserId, email: email ?? null }
+        .prepare("SELECT id, org_id, workos_user_id, email FROM org_admins WHERE org_id = ? AND workos_user_id = ?")
+        .get(orgId, workOsUserId) as OrgAdmin | undefined) ?? { id, org_id: orgId, workos_user_id: workOsUserId, email: email ?? null }
     );
   }
 
-  isOrgAdmin(clerkUserId: string, orgId: string): boolean {
+  isOrgAdmin(workOsUserId: string, orgId: string): boolean {
     const row = this.db
-      .prepare("SELECT 1 FROM org_admins WHERE clerk_user_id = ? AND org_id = ?")
-      .get(clerkUserId, orgId);
+      .prepare("SELECT 1 FROM org_admins WHERE workos_user_id = ? AND org_id = ?")
+      .get(workOsUserId, orgId);
     return row !== undefined;
   }
 
-  /** Every org a given Clerk user administers - powers an admin
+  /** Every org a given WorkOS user administers - powers an admin
    * console's org switcher/landing page. */
-  listOrganizationsForAdmin(clerkUserId: string): Organization[] {
+  listOrganizationsForAdmin(workOsUserId: string): Organization[] {
     return this.db
       .prepare(
         `SELECT o.id, o.name, o.plan FROM organizations o
          JOIN org_admins a ON a.org_id = o.id
-         WHERE a.clerk_user_id = ?
+         WHERE a.workos_user_id = ?
          ORDER BY o.name`,
       )
-      .all(clerkUserId) as Organization[];
+      .all(workOsUserId) as Organization[];
   }
 
   /** Returns the created row plus the plaintext bootstrap token - the only

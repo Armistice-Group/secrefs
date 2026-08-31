@@ -4,7 +4,7 @@ import type { CredentialCipher } from "./crypto/cipher.js";
 import type { STSClient } from "@aws-sdk/client-sts";
 import type { ArnCache, MintAwsCredentialParams } from "./providers/awsSts.js";
 import type { OidcConfig } from "./auth/oidc.js";
-import type { ClerkAuthConfig } from "./auth/clerk.js";
+import type { WorkOsAuthConfig } from "./auth/workos.js";
 
 /** Everything a route handler needs, gathered in one place so tests can
  * inject fakes (an in-memory db, a fixed cipher key, a mocked STS client)
@@ -29,19 +29,19 @@ export interface AppContext {
    * identity federation (docs §9) is then simply unavailable and every
    * principal must use a bootstrap token. See auth/principal.ts. */
   oidcConfig?: OidcConfig;
-  /** Undefined when no Clerk secret key is configured - every management
+  /** Undefined when no WorkOS secret key is configured - every management
    * endpoint (connections, roles, grants, service identities) is then
    * open with no admin auth at all. See auth/adminPrincipal.ts and
    * apps/control-plane/README.md's "Admin auth" section for what that
    * tradeoff means operationally. */
-  clerkConfig?: ClerkAuthConfig;
+  workOsConfig?: WorkOsAuthConfig;
 }
 
 export interface CreateContextOptions {
   stsClient?: STSClient;
   describeClientFactory?: MintAwsCredentialParams["describeClientFactory"];
   oidcConfig?: OidcConfig;
-  clerkConfig?: ClerkAuthConfig;
+  workOsConfig?: WorkOsAuthConfig;
 }
 
 export function createContext(
@@ -57,6 +57,6 @@ export function createContext(
     arnCache: new Map(),
     describeClientFactory: options.describeClientFactory,
     oidcConfig: options.oidcConfig,
-    clerkConfig: options.clerkConfig,
+    workOsConfig: options.workOsConfig,
   };
 }

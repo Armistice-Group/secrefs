@@ -5,15 +5,15 @@ import { buildApp } from "../src/app.js";
 import { createContext } from "../src/context.js";
 import { openDatabase } from "../src/db/client.js";
 import { AesGcmCipher } from "../src/crypto/cipher.js";
-import type { ClerkAuthConfig } from "../src/auth/clerk.js";
+import type { WorkOsAuthConfig } from "../src/auth/workos.js";
 import { FREE_TIER_CONNECTION_LIMIT } from "../src/db/repo.js";
 
 /**
  * End-to-end coverage for the admin-auth gate added on top of every
  * management endpoint (docs: apps/control-plane/README.md's "Admin
- * auth" section). Uses a fake Clerk verifier (`clerkConfig.verify`) that
- * treats any bearer token as its own literal Clerk user id, so tests can
- * express "log in as clerk_admin_1" without a real Clerk instance.
+ * auth" section). Uses a fake WorkOS verifier (`workOsConfig.verify`) that
+ * treats any bearer token as its own literal WorkOS user id, so tests can
+ * express "log in as workos_admin_1" without a real WorkOS instance.
  */
 describe("control plane - admin-gated management endpoints", () => {
   let app: FastifyInstance;
@@ -21,25 +21,26 @@ describe("control plane - admin-gated management endpoints", () => {
   beforeEach(() => {
     const db = openDatabase(":memory:");
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
-    const clerkConfig: ClerkAuthConfig = {
-      secretKey: "sk_test_unused",
+    const workOsConfig: WorkOsAuthConfig = {
+      apiKey: "sk_test_unused",
+      clientId: "client_test_unused",
       verify: async (token) => {
         if (token === "invalid") throw new Error("invalid token");
-        return token; // the bearer token IS the clerk user id, for test simplicity
+        return token; // the bearer token IS the workos user id, for test simplicity
       },
     };
-    app = buildApp(createContext(db, cipher, { clerkConfig }));
+    app = buildApp(createContext(db, cipher, { workOsConfig }));
   });
 
-  function asAdmin(clerkUserId: string) {
-    return { authorization: `Bearer ${clerkUserId}` };
+  function asAdmin(workOsUserId: string) {
+    return { authorization: `Bearer ${workOsUserId}` };
   }
 
   it("creating an org auto-admins the creator, who can then manage it", async () => {
     const orgResponse = await app.inject({
       method: "POST",
       url: "/v1/organizations",
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
       payload: { name: "Acme Corp" },
     });
     expect(orgResponse.statusCode).toBe(201);
@@ -48,7 +49,7 @@ describe("control plane - admin-gated management endpoints", () => {
     const connectionResponse = await app.inject({
       method: "POST",
       url: "/v1/connections",
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
       payload: {
         orgId: org.id,
         alias: "aws-prod",
@@ -73,7 +74,7 @@ describe("control plane - admin-gated management endpoints", () => {
       await app.inject({
         method: "POST",
         url: "/v1/organizations",
-        headers: asAdmin("clerk_founder"),
+        headers: asAdmin("workos_founder"),
         payload: { name: "Acme Corp" },
       })
     ).json();
@@ -91,17 +92,17 @@ describe("control plane - admin-gated management endpoints", () => {
       await app.inject({
         method: "POST",
         url: "/v1/organizations",
-        headers: asAdmin("clerk_founder"),
+        headers: asAdmin("workos_founder"),
         payload: { name: "Acme Corp" },
       })
     ).json();
 
-    // clerk_stranger is a real, verifiable Clerk user - just not an admin
+    // workos_stranger is a real, verifiable WorkOS user - just not an admin
     // of this particular org.
     const response = await app.inject({
       method: "POST",
       url: "/v1/roles",
-      headers: asAdmin("clerk_stranger"),
+      headers: asAdmin("workos_stranger"),
       payload: { orgId: org.id, name: "ci-deploy" },
     });
     expect(response.statusCode).toBe(403);
@@ -112,14 +113,14 @@ describe("control plane - admin-gated management endpoints", () => {
       await app.inject({
         method: "POST",
         url: "/v1/organizations",
-        headers: asAdmin("clerk_founder"),
+        headers: asAdmin("workos_founder"),
         payload: { name: "Acme Corp" },
       })
     ).json();
     await app.inject({
       method: "POST",
       url: "/v1/connections",
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
       payload: {
         orgId: org.id,
         alias: "aws-prod",
@@ -131,14 +132,14 @@ describe("control plane - admin-gated management endpoints", () => {
     const denied = await app.inject({
       method: "GET",
       url: `/v1/connections?orgId=${org.id}`,
-      headers: asAdmin("clerk_stranger"),
+      headers: asAdmin("workos_stranger"),
     });
     expect(denied.statusCode).toBe(403);
 
     const allowed = await app.inject({
       method: "GET",
       url: `/v1/connections?orgId=${org.id}`,
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
     });
     expect(allowed.statusCode).toBe(200);
     const body = allowed.json();
@@ -153,7 +154,7 @@ describe("control plane - admin-gated management endpoints", () => {
       await app.inject({
         method: "POST",
         url: "/v1/organizations",
-        headers: asAdmin("clerk_founder"),
+        headers: asAdmin("workos_founder"),
         payload: { name: "Acme Corp" },
       })
     ).json();
@@ -162,7 +163,7 @@ describe("control plane - admin-gated management endpoints", () => {
       const response = await app.inject({
         method: "POST",
         url: "/v1/connections",
-        headers: asAdmin("clerk_founder"),
+        headers: asAdmin("workos_founder"),
         payload: {
           orgId: org.id,
           alias: `aws-prod-${i}`,
@@ -176,7 +177,7 @@ describe("control plane - admin-gated management endpoints", () => {
     const overLimit = await app.inject({
       method: "POST",
       url: "/v1/connections",
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
       payload: {
         orgId: org.id,
         alias: "one-too-many",
@@ -192,20 +193,20 @@ describe("control plane - admin-gated management endpoints", () => {
     await app.inject({
       method: "POST",
       url: "/v1/organizations",
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
       payload: { name: "Founder's Org" },
     });
     await app.inject({
       method: "POST",
       url: "/v1/organizations",
-      headers: asAdmin("clerk_stranger"),
+      headers: asAdmin("workos_stranger"),
       payload: { name: "Stranger's Org" },
     });
 
     const response = await app.inject({
       method: "GET",
       url: "/v1/organizations",
-      headers: asAdmin("clerk_founder"),
+      headers: asAdmin("workos_founder"),
     });
     expect(response.statusCode).toBe(200);
     const orgs = response.json().organizations;
@@ -215,10 +216,10 @@ describe("control plane - admin-gated management endpoints", () => {
 });
 
 describe("control plane - management endpoints with no admin auth configured", () => {
-  it("stays open (documented tradeoff) - existing behavior for anyone not opting into Clerk", async () => {
+  it("stays open (documented tradeoff) - existing behavior for anyone not opting into WorkOS", async () => {
     const db = openDatabase(":memory:");
     const cipher = new AesGcmCipher(randomBytes(32).toString("base64"));
-    const app = buildApp(createContext(db, cipher, {})); // no clerkConfig at all
+    const app = buildApp(createContext(db, cipher, {})); // no workOsConfig at all
 
     const response = await app.inject({
       method: "POST",

@@ -308,9 +308,14 @@ provider itself.
 SaaS is planned eventually (self-hosting stays supported, but won't be
 the only path) — worth designing with that in mind rather than
 retrofitting later. First concrete step: human admin accounts now exist
-(`org_admins`, Clerk-authenticated — see
+(`org_admins`, WorkOS-authenticated — see
 `apps/control-plane/README.md`'s "Admin auth" section), gating every
 management endpoint that used to have no authentication at all. §5's
 `User` entity is realized as `org_admins`, not a full `users` table —
-Clerk *is* the user directory; the control plane only tracks which
-Clerk user administers which org.
+WorkOS *is* the user directory; the control plane only tracks which
+WorkOS user administers which org. Chose WorkOS over Clerk specifically
+for the enterprise-SSO/SCIM roadmap fit and JWT/JWKS consistency with
+`auth/oidc.ts`'s machine-token verification (same underlying operation,
+different token source) — Clerk's prebuilt-UI polish is real but wasn't
+enough to outweigh that for a product that will need to support a
+customer's own IdP per org.

@@ -34,7 +34,7 @@ export function registerConnectionRoutes(app: FastifyInstance, ctx: AppContext):
       return reply.code(400).send({ error: 'orgId, alias, and provider ("aws" | "bitwarden") are required' });
     }
 
-    const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, orgId);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     if (!credential || !isValidCredentialFor(provider, credential)) {
@@ -64,7 +64,7 @@ export function registerConnectionRoutes(app: FastifyInstance, ctx: AppContext):
     const orgId = request.query.orgId;
     if (!orgId) return reply.code(400).send({ error: "orgId query parameter is required" });
 
-    const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, orgId);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     return reply.send({ connections: ctx.repo.listVaultConnections(orgId) });

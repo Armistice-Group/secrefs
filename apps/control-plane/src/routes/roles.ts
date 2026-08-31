@@ -7,7 +7,7 @@ export function registerRoleRoutes(app: FastifyInstance, ctx: AppContext): void 
     const { orgId, name } = request.body ?? {};
     if (!orgId || !name) return reply.code(400).send({ error: "orgId and name are required" });
 
-    const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, orgId);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     const role = ctx.repo.createRole(orgId, name);
@@ -18,7 +18,7 @@ export function registerRoleRoutes(app: FastifyInstance, ctx: AppContext): void 
     const orgId = request.query.orgId;
     if (!orgId) return reply.code(400).send({ error: "orgId query parameter is required" });
 
-    const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, orgId);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     return reply.send({ roles: ctx.repo.listRoles(orgId) });
@@ -32,7 +32,7 @@ export function registerRoleRoutes(app: FastifyInstance, ctx: AppContext): void 
 
       const role = ctx.repo.findRoleById(request.params.roleId);
       if (!role) return reply.code(404).send({ error: `no role "${request.params.roleId}"` });
-      const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, role.org_id);
+      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, role.org_id);
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
       ctx.repo.bindServiceIdentityToRole(request.params.roleId, serviceIdentityId);
@@ -51,7 +51,7 @@ export function registerRoleRoutes(app: FastifyInstance, ctx: AppContext): void 
 
     const role = ctx.repo.findRoleById(request.params.roleId);
     if (!role) return reply.code(404).send({ error: `no role "${request.params.roleId}"` });
-    const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, role.org_id);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, role.org_id);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     const grant = ctx.repo.createGrant(
@@ -66,7 +66,7 @@ export function registerRoleRoutes(app: FastifyInstance, ctx: AppContext): void 
   app.get<{ Params: { roleId: string } }>("/v1/roles/:roleId/grants", async (request, reply) => {
     const role = ctx.repo.findRoleById(request.params.roleId);
     if (!role) return reply.code(404).send({ error: `no role "${request.params.roleId}"` });
-    const admin = await requireOrgAdmin(ctx.repo, ctx.clerkConfig, request.headers.authorization, role.org_id);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, role.org_id);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     return reply.send({ grants: ctx.repo.listGrantsForRole(request.params.roleId) });

@@ -55,9 +55,9 @@ production build described in the design doc. Specifically:
   the wildcard. See `src/providers/awsSts.ts`.
 - ~~Management endpoints (connections, roles, grants, service
   identities) had no authentication at all~~ **Fixed, opt-in.** Every
-  one of those now requires a Clerk-authenticated human admin of the
+  one of those now requires a WorkOS-authenticated human admin of the
   target org (`src/auth/adminPrincipal.ts` + `src/auth/requireOrgAdmin.ts`)
-  when `CLERK_SECRET_KEY` is set. If it isn't, these endpoints stay open
+  when `WORKOS_API_KEY` and `WORKOS_CLIENT_ID` are set. If they aren't, these endpoints stay open
   — the same as before this fix — and the server prints a loud warning
   at boot saying so. See "Admin auth" below for why that's opt-in
   rather than forced.
@@ -84,28 +84,29 @@ Or for local iteration: `pnpm --filter @secrefs/control-plane dev` (same
 | `SECREFS_CP_OIDC_GITLAB` | — | Set to `true` for gitlab.com, or a self-managed instance's base URL |
 | `SECREFS_CP_TRUSTED_OIDC_ISSUERS` | — | JSON `{issuer, jwksUrl}[]` — the generic/configurable path for any other OIDC issuer |
 | `SECREFS_CP_OIDC_AUDIENCE` | — | Required if any OIDC issuer above is configured — the `aud` claim every trusted token must carry |
-| `CLERK_SECRET_KEY` | — | Enables admin auth on every management endpoint — see "Admin auth" below. Unset means those endpoints are open; the server prints a warning at boot when this is the case. |
+| `WORKOS_API_KEY` | — | Enables admin auth on every management endpoint (together with `WORKOS_CLIENT_ID`) — see "Admin auth" below. Either unset means those endpoints are open; the server prints a warning at boot when this is the case. |
+| `WORKOS_CLIENT_ID` | — | Your AuthKit client id — identifies which JWKS to verify admin session tokens against. |
 
 ## Admin auth
 
 Every endpoint that creates or configures things — orgs, connections,
-roles, grants, service identities — requires a Clerk-authenticated human
-who administers the target org, *if* `CLERK_SECRET_KEY` is set. (The
+roles, grants, service identities — requires a WorkOS-authenticated human
+who administers the target org, *if* `WORKOS_API_KEY` and `WORKOS_CLIENT_ID` are set. (The
 runtime endpoints, `/v1/credentials/mint` and `/v1/audit`, are unrelated
 to this — those already required a service identity or verified OIDC
 token, unchanged.)
 
 **Why opt-in rather than required to boot at all**, unlike the cipher key:
-Clerk is a third-party cloud dependency, and forcing every self-hoster —
+WorkOS is a third-party cloud dependency, and forcing every self-hoster —
 including someone just running `docker compose up` for personal,
 single-operator use — to set one up before the server even starts would
 contradict the "simple self-hosting stays simple" goal. So it's a loud,
 impossible-to-miss warning at boot instead of a hard requirement:
 appropriate for a fully local/trusted-network deployment, wrong for
-anything internet-reachable — set `CLERK_SECRET_KEY` before that.
+anything internet-reachable — set both before that.
 
 Creating an org (`POST /v1/organizations`) is the one bootstrap
-exception: it only requires *some* valid Clerk admin principal (any
+exception: it only requires *some* valid WorkOS admin principal (any
 authenticated human, no existing org membership to check), and the
 creator automatically becomes that org's founding admin
 (`org_admins`, migration `0003`).
@@ -174,8 +175,8 @@ Specifically, as the operator, you now own:
 
 ## API surface (v1)
 
-All routes marked **admin** require a Clerk-authenticated admin of the
-target org when `CLERK_SECRET_KEY` is set (open otherwise — see "Admin
+All routes marked **admin** require a WorkOS-authenticated admin of the
+target org when WorkOS is configured (open otherwise — see "Admin
 auth" above). `mint`/`audit` are unrelated to admin auth — those use
 service-identity/OIDC auth, unchanged.
 

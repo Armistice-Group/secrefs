@@ -276,13 +276,46 @@ provider itself.
   their public API supports the scoped-short-lived-credential primitive
   this design depends on (§8). Needs a real answer before it gets a phase.
 
-## 12. Open questions for Nathan
+## 12. Open questions — answered
 
-1. Does `apps/control-plane` live in *this* monorepo, or is it a separate
-   service/repo entirely? (Affects deploy topology, not the design above.)
-2. Pricing/tiering shape — is RBAC + audit a paid tier, gating the free
-   BYOV-ambient mode as-is today? Doesn't affect the technical design but
-   affects what "v1 done" means.
-3. Confirm the credential-broker decision in §3 — this is the one call in
-   this doc that changes what the README can honestly claim, so it's worth
-   an explicit yes before anything gets built on top of it.
+1. ~~Does `apps/control-plane` live in *this* monorepo, or is it a
+   separate service/repo entirely?~~ **Answered: stays in this
+   monorepo.** Revisit only if deploy cadence or team ownership
+   meaningfully diverges from `packages/node`/`packages/python`.
+2. ~~Pricing/tiering shape~~ **Answered, two-part:**
+   - **Self-hosting**: free for personal use; commercial self-hosting
+     carries a fee. That distinction can't be enforced by the code
+     alone — a self-hoster controls their own infra — it needs an
+     actual field-of-use license (BSL/Elastic-License/FSL-style, not
+     MIT, which has no such restriction and is what's currently
+     declared in `package.json`/`pyproject.toml` metadata, though no
+     LICENSE file exists yet at the repo root). Not yet decided or
+     built; needs Nathan to pick exact terms before any LICENSE file
+     changes.
+   - **Hosted/support**: support carries a fee regardless of
+     self-hosted vs. SecRefs-hosted. A `plan` field on `Organization`
+     (`'free' | 'paid'`, migration `0003`) plus a free-tier vault
+     connection limit (`FREE_TIER_CONNECTION_LIMIT`,
+     `apps/control-plane/src/db/repo.ts`) is built and enforced in
+     `POST /v1/connections` (`402` past the limit) — this part
+     doesn't depend on the licensing decision and works identically
+     self-hosted or SaaS-hosted, though it's only a real (non-
+     circumventable) limit on a SecRefs-operated instance.
+3. ~~Confirm the credential-broker decision in §3~~ **Answered: yes** —
+   confirmed by proceeding to build on top of it (PR #3 onward).
+
+**New, from building the admin console's prerequisites:** SecRefs-hosted
+SaaS is planned eventually (self-hosting stays supported, but won't be
+the only path) — worth designing with that in mind rather than
+retrofitting later. First concrete step: human admin accounts now exist
+(`org_admins`, WorkOS-authenticated — see
+`apps/control-plane/README.md`'s "Admin auth" section), gating every
+management endpoint that used to have no authentication at all. §5's
+`User` entity is realized as `org_admins`, not a full `users` table —
+WorkOS *is* the user directory; the control plane only tracks which
+WorkOS user administers which org. Chose WorkOS over Clerk specifically
+for the enterprise-SSO/SCIM roadmap fit and JWT/JWKS consistency with
+`auth/oidc.ts`'s machine-token verification (same underlying operation,
+different token source) — Clerk's prebuilt-UI polish is real but wasn't
+enough to outweigh that for a product that will need to support a
+customer's own IdP per org.

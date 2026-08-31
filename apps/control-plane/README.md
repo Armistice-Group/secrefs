@@ -53,6 +53,14 @@ production build described in the design doc. Specifically:
   it now also resolves the exact ARN via one `DescribeSecret` call and
   caches it, so every mint after that is scoped to the precise ARN, not
   the wildcard. See `src/providers/awsSts.ts`.
+- ~~Management endpoints (connections, roles, grants, service
+  identities) had no authentication at all~~ **Fixed, opt-in.** Every
+  one of those now requires a WorkOS-authenticated human admin of the
+  target org (`src/auth/adminPrincipal.ts` + `src/auth/requireOrgAdmin.ts`)
+  when `WORKOS_API_KEY` and `WORKOS_CLIENT_ID` are set. If they aren't, these endpoints stay open
+  — the same as before this fix — and the server prints a loud warning
+  at boot saying so. See "Admin auth" below for why that's opt-in
+  rather than forced.
 
 ## Run it locally (no Docker)
 
@@ -76,6 +84,38 @@ Or for local iteration: `pnpm --filter @secrefs/control-plane dev` (same
 | `SECREFS_CP_OIDC_GITLAB` | — | Set to `true` for gitlab.com, or a self-managed instance's base URL |
 | `SECREFS_CP_TRUSTED_OIDC_ISSUERS` | — | JSON `{issuer, jwksUrl}[]` — the generic/configurable path for any other OIDC issuer |
 | `SECREFS_CP_OIDC_AUDIENCE` | — | Required if any OIDC issuer above is configured — the `aud` claim every trusted token must carry |
+| `WORKOS_API_KEY` | — | Enables admin auth on every management endpoint (together with `WORKOS_CLIENT_ID`) — see "Admin auth" below. Either unset means those endpoints are open; the server prints a warning at boot when this is the case. |
+| `WORKOS_CLIENT_ID` | — | Your AuthKit client id — identifies which JWKS to verify admin session tokens against. |
+
+## Admin auth
+
+Every endpoint that creates or configures things — orgs, connections,
+roles, grants, service identities — requires a WorkOS-authenticated human
+who administers the target org, *if* `WORKOS_API_KEY` and `WORKOS_CLIENT_ID` are set. (The
+runtime endpoints, `/v1/credentials/mint` and `/v1/audit`, are unrelated
+to this — those already required a service identity or verified OIDC
+token, unchanged.)
+
+**Why opt-in rather than required to boot at all**, unlike the cipher key:
+WorkOS is a third-party cloud dependency, and forcing every self-hoster —
+including someone just running `docker compose up` for personal,
+single-operator use — to set one up before the server even starts would
+contradict the "simple self-hosting stays simple" goal. So it's a loud,
+impossible-to-miss warning at boot instead of a hard requirement:
+appropriate for a fully local/trusted-network deployment, wrong for
+anything internet-reachable — set both before that.
+
+Creating an org (`POST /v1/organizations`) is the one bootstrap
+exception: it only requires *some* valid WorkOS admin principal (any
+authenticated human, no existing org membership to check), and the
+creator automatically becomes that org's founding admin
+(`org_admins`, migration `0003`).
+
+Free-plan orgs (the default — `organizations.plan`) are capped at
+`FREE_TIER_CONNECTION_LIMIT` (`src/db/repo.ts`) vault connections;
+`POST /v1/connections` returns `402` past that. `'paid'` orgs are
+unlimited today — there's no billing integration yet, `plan` is set
+directly in the database for now.
 
 ## Self-hosting
 
@@ -135,17 +175,27 @@ Specifically, as the operator, you now own:
 
 ## API surface (v1)
 
-| Route | What |
-|---|---|
-| `POST /v1/organizations` | Create an org |
-| `POST /v1/service-identities` | Create a machine principal; response includes the bootstrap token **once** |
-| `POST /v1/service-identities/:id/oidc-bindings` | Trust a CI job's OIDC identity instead of (or alongside) a bootstrap token — `{ issuer, subjectPattern }`, `subjectPattern` matched against the token's `sub` claim with the same glob-lite rules as `Grant.path_pattern` |
-| `POST /v1/connections` | Connect a vault — `provider: "aws"` + `credential: { roleArn, region, externalId? }`, or `provider: "bitwarden"` + `credential: { accessToken, organizationId? }` |
-| `POST /v1/roles` | Create a role |
-| `POST /v1/roles/:roleId/bindings` | Bind a service identity to a role |
-| `POST /v1/roles/:roleId/grants` | Grant a role access to a connection, scoped to a `pathPattern` (see `src/rbac/match.ts`) |
-| `POST /v1/credentials/mint` | `Authorization: Bearer <bootstrap token OR verified OIDC token>` + `{ alias, path }` → a resolved credential (freshly scoped for AWS, distributed as-is for Bitwarden — see above), or a `403` with why not |
-| `GET /v1/audit` | This org's `AuthorizationEvent` log |
+All routes marked **admin** require a WorkOS-authenticated admin of the
+target org when WorkOS is configured (open otherwise — see "Admin
+auth" above). `mint`/`audit` are unrelated to admin auth — those use
+service-identity/OIDC auth, unchanged.
+
+| Route | Auth | What |
+|---|---|---|
+| `POST /v1/organizations` | admin (bootstrap) | Create an org — the creator becomes its founding admin |
+| `GET /v1/organizations` | admin | List orgs the caller administers |
+| `POST /v1/service-identities` | admin | Create a machine principal; response includes the bootstrap token **once** |
+| `GET /v1/service-identities?orgId=` | admin | List an org's service identities |
+| `POST /v1/service-identities/:id/oidc-bindings` | admin | Trust a CI job's OIDC identity instead of (or alongside) a bootstrap token — `{ issuer, subjectPattern }`, `subjectPattern` matched against the token's `sub` claim with the same glob-lite rules as `Grant.path_pattern` |
+| `POST /v1/connections` | admin | Connect a vault — `provider: "aws"` + `credential: { roleArn, region, externalId? }`, or `provider: "bitwarden"` + `credential: { accessToken, organizationId? }`. `402` past the free-tier connection limit. |
+| `GET /v1/connections?orgId=` | admin | List an org's connections (never includes the encrypted credential) |
+| `POST /v1/roles` | admin | Create a role |
+| `GET /v1/roles?orgId=` | admin | List an org's roles |
+| `POST /v1/roles/:roleId/bindings` | admin | Bind a service identity to a role |
+| `POST /v1/roles/:roleId/grants` | admin | Grant a role access to a connection, scoped to a `pathPattern` (see `src/rbac/match.ts`) |
+| `GET /v1/roles/:roleId/grants` | admin | List a role's grants |
+| `POST /v1/credentials/mint` | service identity / OIDC | `{ alias, path }` → a resolved credential (freshly scoped for AWS, distributed as-is for Bitwarden — see above), or a `403` with why not |
+| `GET /v1/audit` | service identity / OIDC | This org's `AuthorizationEvent` log |
 
 ## Tests
 

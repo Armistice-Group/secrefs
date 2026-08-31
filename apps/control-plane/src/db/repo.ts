@@ -1,10 +1,25 @@
 import { randomUUID } from "node:crypto";
 import type { ControlPlaneDb } from "./client.js";
 
+export type OrgPlan = "free" | "paid";
+
 export interface Organization {
   id: string;
   name: string;
+  plan: OrgPlan;
 }
+
+export interface OrgAdmin {
+  id: string;
+  org_id: string;
+  clerk_user_id: string;
+  email: string | null;
+}
+
+/** Free-tier orgs may connect at most this many vaults - enforced in
+ * routes/connections.ts. Bump by changing this one constant; no schema
+ * change needed since it's not stored per-org (only the `plan` is). */
+export const FREE_TIER_CONNECTION_LIMIT = 3;
 
 export interface ServiceIdentity {
   id: string;
@@ -54,7 +69,49 @@ export class ControlPlaneRepo {
     this.db
       .prepare("INSERT INTO organizations (id, name) VALUES (?, ?)")
       .run(id, name);
-    return { id, name };
+    return { id, name, plan: "free" };
+  }
+
+  findOrganizationById(id: string): Organization | undefined {
+    return this.db.prepare("SELECT id, name, plan FROM organizations WHERE id = ?").get(id) as
+      | Organization
+      | undefined;
+  }
+
+  /** Registers `clerkUserId` as an admin of `orgId` - idempotent, so
+   * calling it again for the same pair is a no-op rather than an error. */
+  createOrgAdmin(orgId: string, clerkUserId: string, email?: string): OrgAdmin {
+    const id = randomUUID();
+    this.db
+      .prepare(
+        "INSERT OR IGNORE INTO org_admins (id, org_id, clerk_user_id, email) VALUES (?, ?, ?, ?)",
+      )
+      .run(id, orgId, clerkUserId, email ?? null);
+    return (
+      (this.db
+        .prepare("SELECT id, org_id, clerk_user_id, email FROM org_admins WHERE org_id = ? AND clerk_user_id = ?")
+        .get(orgId, clerkUserId) as OrgAdmin | undefined) ?? { id, org_id: orgId, clerk_user_id: clerkUserId, email: email ?? null }
+    );
+  }
+
+  isOrgAdmin(clerkUserId: string, orgId: string): boolean {
+    const row = this.db
+      .prepare("SELECT 1 FROM org_admins WHERE clerk_user_id = ? AND org_id = ?")
+      .get(clerkUserId, orgId);
+    return row !== undefined;
+  }
+
+  /** Every org a given Clerk user administers - powers an admin
+   * console's org switcher/landing page. */
+  listOrganizationsForAdmin(clerkUserId: string): Organization[] {
+    return this.db
+      .prepare(
+        `SELECT o.id, o.name, o.plan FROM organizations o
+         JOIN org_admins a ON a.org_id = o.id
+         WHERE a.clerk_user_id = ?
+         ORDER BY o.name`,
+      )
+      .all(clerkUserId) as Organization[];
   }
 
   /** Returns the created row plus the plaintext bootstrap token - the only
@@ -79,6 +136,12 @@ export class ControlPlaneRepo {
     return this.db
       .prepare("SELECT id, org_id, name FROM service_identities WHERE id = ?")
       .get(id) as ServiceIdentity | undefined;
+  }
+
+  listServiceIdentities(orgId: string): ServiceIdentity[] {
+    return this.db
+      .prepare("SELECT id, org_id, name FROM service_identities WHERE org_id = ? ORDER BY name")
+      .all(orgId) as ServiceIdentity[];
   }
 
   createOidcBinding(serviceIdentityId: string, issuer: string, subjectPattern: string): OidcBinding {
@@ -126,10 +189,37 @@ export class ControlPlaneRepo {
       .get(orgId, alias) as VaultConnection | undefined;
   }
 
+  countVaultConnections(orgId: string): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) as n FROM vault_connections WHERE org_id = ?")
+      .get(orgId) as { n: number };
+    return row.n;
+  }
+
+  /** For an admin console listing - deliberately omits `encrypted_credential`
+   * (the query never selects it, not just "the route strips it later") so
+   * there's no code path where a future change could accidentally leak it
+   * into a response. */
+  listVaultConnections(orgId: string): Omit<VaultConnection, "encrypted_credential">[] {
+    return this.db
+      .prepare("SELECT id, org_id, provider, alias FROM vault_connections WHERE org_id = ? ORDER BY alias")
+      .all(orgId) as Omit<VaultConnection, "encrypted_credential">[];
+  }
+
   createRole(orgId: string, name: string): Role {
     const id = randomUUID();
     this.db.prepare("INSERT INTO roles (id, org_id, name) VALUES (?, ?, ?)").run(id, orgId, name);
     return { id, org_id: orgId, name };
+  }
+
+  findRoleById(id: string): Role | undefined {
+    return this.db.prepare("SELECT id, org_id, name FROM roles WHERE id = ?").get(id) as Role | undefined;
+  }
+
+  listRoles(orgId: string): Role[] {
+    return this.db
+      .prepare("SELECT id, org_id, name FROM roles WHERE org_id = ? ORDER BY name")
+      .all(orgId) as Role[];
   }
 
   bindServiceIdentityToRole(roleId: string, serviceIdentityId: string): void {
@@ -153,6 +243,14 @@ export class ControlPlaneRepo {
       )
       .run(id, roleId, vaultConnectionId, pathPattern, maxTtlSeconds);
     return { id, role_id: roleId, vault_connection_id: vaultConnectionId, path_pattern: pathPattern, max_ttl_seconds: maxTtlSeconds };
+  }
+
+  listGrantsForRole(roleId: string): Grant[] {
+    return this.db
+      .prepare(
+        "SELECT id, role_id, vault_connection_id, path_pattern, max_ttl_seconds FROM grants WHERE role_id = ?",
+      )
+      .all(roleId) as Grant[];
   }
 
   /** Every grant reachable by a service identity for one vault connection,

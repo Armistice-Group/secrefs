@@ -68,6 +68,27 @@ asyncio.run(main())
 | `bitwarden` | Bitwarden Secrets Manager | `BWS_ACCESS_TOKEN`, `BWS_ORGANIZATION_ID` (only needed to address a secret by name instead of its UUID) |
 | `local` | Gitignored `.secrefs.local.json` | none — local dev only |
 
+The `aws` and `bitwarden` providers can also source their credentials
+from a running [control plane](apps/control-plane) instead of ambient
+env vars — RBAC-authorized, per-request for AWS, audited either way:
+
+```ts
+import { AwsSecretsManagerProvider, SecRefs } from "@secrefs/node";
+
+const secRefs = new SecRefs({
+  providers: {
+    "aws-prod": new AwsSecretsManagerProvider({
+      region: "us-east-1",
+      controlPlane: {
+        baseUrl: process.env.SECREFS_CONTROL_PLANE_URL!,
+        token: process.env.SECREFS_CONTROL_PLANE_TOKEN!, // bootstrap token or a verified OIDC token
+        alias: "aws-prod", // must match the VaultConnection's alias on the control plane
+      },
+    }),
+  },
+});
+```
+
 ## Development
 
 ```bash

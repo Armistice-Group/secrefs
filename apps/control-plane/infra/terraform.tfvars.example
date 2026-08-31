@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars and adjust. Every variable has a default that
+# works — there is nothing here you are *required* to set, unlike the
+# armory-swap stack, because no secret value is an input to this one.
+
+api_domain = "api.secrefs.com"
+
+# Origins the admin console is served from. Leave empty until it exists —
+# an empty list means the app emits no CORS headers at all.
+# cors_origins = ["https://admin.secrefs.com"]
+
+# Real KMS envelope encryption (the production custody path). Set false to
+# fall back to the static SECREFS_CP_CIPHER_KEY out of Secrets Manager.
+# enable_kms_cipher = true
+
+# ~$33/mo. Required for WorkOS admin auth, Bitwarden connections, and OIDC
+# JWKS fetches — see variables.tf.
+# enable_nat_gateway = true
+
+# ~$66/mo for nine interface endpoints. Keeps Secrets Manager / KMS / STS
+# traffic off the public internet entirely; also what lets the instance
+# boot with enable_nat_gateway = false.
+# enable_vpc_endpoints = true
+
+# Set true before this holds anything you would mind losing.
+# deletion_protection = false

@@ -60,6 +60,40 @@ asyncio.run(main())
 "
 ```
 
+## Two ways to expand, and when each is wrong
+
+A `sec://` reference is a **stable name for a value that changes**. Which
+of these you use decides whether that actually holds:
+
+**At use (recommended).** Expand where the secret is consumed. Every call
+re-fetches, so rotating the value at the source reaches this consumer
+with no redeploy:
+
+```ts
+import { secRefs } from "@secrefs/node";
+
+async function callVendorApi() {
+  const key = await secRefs.expandString("sec://aws-prod/hackerone#api_key");
+  return fetch(url, { headers: { authorization: `Bearer ${key}` } });
+}
+```
+
+**At load (`secrefs run`).** Expands once at startup and bakes plain
+strings into the child's environment. Convenient, and the right choice
+for short-lived processes like a CI job — but an environment variable is
+a static string, so **a long-running process keeps the pre-rotation value
+until it restarts**. Don't use it for the thing you intend to rotate
+underneath a running service.
+
+Network-backed providers re-fetch on every expansion by default.
+Concurrent expansions of the same reference still share one request, and
+`cacheTtlMs` trades a bounded window of staleness for fewer round trips
+if you need it:
+
+```ts
+new AwsSecretsManagerProvider({ cacheTtlMs: 30_000 }); // rotation lands within 30s
+```
+
 ## Providers
 
 | Alias | Backend | Ambient auth |

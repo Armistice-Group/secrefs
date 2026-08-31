@@ -4,7 +4,7 @@ import type { Migration } from "./migrations/types.js";
 const MIGRATIONS_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS _migrations (
     id TEXT PRIMARY KEY,
-    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 `;
 
@@ -19,22 +19,20 @@ const MIGRATIONS_TABLE_SQL = `
  * database just finds nothing new to apply. Returns the ids of whatever
  * ran this call (empty on a database that was already up to date).
  */
-export function runMigrations(db: ControlPlaneDb, migrations: Migration[]): string[] {
-  db.exec(MIGRATIONS_TABLE_SQL);
+export async function runMigrations(db: ControlPlaneDb, migrations: Migration[]): Promise<string[]> {
+  await db.exec(MIGRATIONS_TABLE_SQL);
 
-  const alreadyApplied = new Set(
-    (db.prepare("SELECT id FROM _migrations").all() as { id: string }[]).map((row) => row.id),
-  );
+  const applied = await db.all<{ id: string }>("SELECT id FROM _migrations");
+  const alreadyApplied = new Set(applied.map((row) => row.id));
 
   const ran: string[] = [];
   for (const migration of migrations) {
     if (alreadyApplied.has(migration.id)) continue;
 
-    const applyAndRecord = db.transaction(() => {
-      migration.up(db);
-      db.prepare("INSERT INTO _migrations (id) VALUES (?)").run(migration.id);
+    await db.transaction(async () => {
+      await migration.up(db);
+      await db.run("INSERT INTO _migrations (id) VALUES (?)", [migration.id]);
     });
-    applyAndRecord();
     ran.push(migration.id);
   }
 

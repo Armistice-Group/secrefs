@@ -14,7 +14,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
       const { token, tokenHash } = generateBootstrapToken();
-      const identity = ctx.repo.createServiceIdentity(orgId, name, tokenHash);
+      const identity = await ctx.repo.createServiceIdentity(orgId, name, tokenHash);
 
       // The only response that ever contains the plaintext token - it is
       // not retrievable through any other API afterward.
@@ -29,7 +29,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
     const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
-    return reply.send({ serviceIdentities: ctx.repo.listServiceIdentities(orgId) });
+    return reply.send({ serviceIdentities: await ctx.repo.listServiceIdentities(orgId) });
   });
 
   // Trusts a CI job's own OIDC identity token instead of a bootstrap
@@ -42,14 +42,14 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       if (!issuer || !subjectPattern) {
         return reply.code(400).send({ error: "issuer and subjectPattern are required" });
       }
-      const identity = ctx.repo.findServiceIdentityById(request.params.id);
+      const identity = await ctx.repo.findServiceIdentityById(request.params.id);
       if (!identity) {
         return reply.code(404).send({ error: `no service identity "${request.params.id}"` });
       }
       const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, identity.org_id);
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
-      const binding = ctx.repo.createOidcBinding(identity.id, issuer, subjectPattern);
+      const binding = await ctx.repo.createOidcBinding(identity.id, issuer, subjectPattern);
       return reply.code(201).send(binding);
     },
   );

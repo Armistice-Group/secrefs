@@ -14,8 +14,8 @@ import type { Migration } from "./types.js";
  */
 export const migration_0003_org_admins: Migration = {
   id: "0003_org_admins",
-  up: (db) => {
-    db.exec(`
+  up: async (db) => {
+    await db.exec(`
       ALTER TABLE organizations ADD COLUMN plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'paid'));
 
       CREATE TABLE org_admins (
@@ -23,7 +23,7 @@ export const migration_0003_org_admins: Migration = {
         org_id TEXT NOT NULL REFERENCES organizations(id),
         workos_user_id TEXT NOT NULL,
         email TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (org_id, workos_user_id)
       );
 

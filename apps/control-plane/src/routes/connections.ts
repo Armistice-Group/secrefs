@@ -46,15 +46,15 @@ export function registerConnectionRoutes(app: FastifyInstance, ctx: AppContext):
       });
     }
 
-    const org = ctx.repo.findOrganizationById(orgId);
-    if (org?.plan === "free" && ctx.repo.countVaultConnections(orgId) >= FREE_TIER_CONNECTION_LIMIT) {
+    const org = await ctx.repo.findOrganizationById(orgId);
+    if (org?.plan === "free" && (await ctx.repo.countVaultConnections(orgId)) >= FREE_TIER_CONNECTION_LIMIT) {
       return reply.code(402).send({
         error: `the free plan is limited to ${FREE_TIER_CONNECTION_LIMIT} vault connections - upgrade to add more`,
       });
     }
 
     const encrypted = await ctx.cipher.encrypt(JSON.stringify(credential), { orgId });
-    const connection = ctx.repo.createVaultConnection(orgId, provider, alias, encrypted);
+    const connection = await ctx.repo.createVaultConnection(orgId, provider, alias, encrypted);
 
     // Never echo the credential back, encrypted or not.
     return reply.code(201).send({ id: connection.id, orgId, alias, provider });
@@ -67,6 +67,6 @@ export function registerConnectionRoutes(app: FastifyInstance, ctx: AppContext):
     const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
-    return reply.send({ connections: ctx.repo.listVaultConnections(orgId) });
+    return reply.send({ connections: await ctx.repo.listVaultConnections(orgId) });
   });
 }

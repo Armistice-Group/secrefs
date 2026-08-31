@@ -48,7 +48,7 @@ export async function resolvePrincipal(
   const token = authorizationHeader.slice("Bearer ".length).trim();
   if (!token) return undefined;
 
-  const byBootstrapToken = repo.findServiceIdentityByTokenHash(hashToken(token));
+  const byBootstrapToken = await repo.findServiceIdentityByTokenHash(hashToken(token));
   if (byBootstrapToken) return byBootstrapToken;
 
   if (!oidcConfig || token.split(".").length !== 3) return undefined;
@@ -64,8 +64,8 @@ export async function resolvePrincipal(
   const iss = typeof claims.iss === "string" ? claims.iss : undefined;
   if (!sub || !iss) return undefined;
 
-  const binding = repo.findOidcBindingsByIssuer(iss).find((b) => matchesPathPattern(b.subject_pattern, sub));
+  const binding = (await repo.findOidcBindingsByIssuer(iss)).find((b) => matchesPathPattern(b.subject_pattern, sub));
   if (!binding) return undefined;
 
-  return repo.findServiceIdentityById(binding.service_identity_id);
+  return await repo.findServiceIdentityById(binding.service_identity_id);
 }

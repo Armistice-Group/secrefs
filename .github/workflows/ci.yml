@@ -18,6 +18,25 @@ jobs:
   node:
     name: Node (typecheck, test, build)
     runs-on: ubuntu-latest
+
+    # The control plane's Postgres tests skip themselves when
+    # SECREFS_TEST_DATABASE_URL is unset, so without a real server here
+    # they'd quietly pass by not running - exactly the failure mode they
+    # exist to prevent. Postgres 16 matches what infra/ provisions on RDS.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: secrefs_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,8 +53,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Runs across every workspace package via turbo: @secrefs/node,
-      # @secrefs/control-plane, @secrefs/web.
+      # @secrefs/control-plane, @secrefs/control-plane-admin, @secrefs/web.
       - run: pnpm turbo run typecheck test build
+        env:
+          # ssl is disabled by the test's own connection options - this is
+          # a throwaway container on localhost, not RDS.
+          SECREFS_TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/secrefs_test
 
   python:
     name: Python (pytest, mypy)

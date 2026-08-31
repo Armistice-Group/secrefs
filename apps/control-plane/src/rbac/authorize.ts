@@ -12,16 +12,19 @@ export type AuthorizationDecision =
  * grants match, the credential is minted at the *shortest* of their
  * max TTLs - least privilege wins over convenience.
  */
-export function authorize(
+export async function authorize(
   repo: ControlPlaneRepo,
   params: { orgId: string; serviceIdentityId: string; alias: string; path: string },
-): AuthorizationDecision {
-  const connection = repo.findVaultConnectionByAlias(params.orgId, params.alias);
+): Promise<AuthorizationDecision> {
+  const connection = await repo.findVaultConnectionByAlias(params.orgId, params.alias);
   if (!connection) {
     return { allowed: false, reason: `no vault connection with alias "${params.alias}"`, connectionId: null };
   }
 
-  const grants = repo.grantsForServiceIdentityAndConnection(params.serviceIdentityId, connection.id);
+  const grants = await repo.grantsForServiceIdentityAndConnection(
+    params.serviceIdentityId,
+    connection.id,
+  );
   const matching = grants.filter((g) => matchesPathPattern(g.path_pattern, params.path));
 
   if (matching.length === 0) {

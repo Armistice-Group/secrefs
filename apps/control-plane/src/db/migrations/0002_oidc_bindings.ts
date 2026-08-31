@@ -15,14 +15,14 @@ import type { Migration } from "./types.js";
  */
 export const migration_0002_oidc_bindings: Migration = {
   id: "0002_oidc_bindings",
-  up: (db) => {
-    db.exec(`
+  up: async (db) => {
+    await db.exec(`
       CREATE TABLE oidc_bindings (
         id TEXT PRIMARY KEY,
         service_identity_id TEXT NOT NULL REFERENCES service_identities(id),
         issuer TEXT NOT NULL,
         subject_pattern TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE INDEX idx_oidc_bindings_issuer ON oidc_bindings(issuer);

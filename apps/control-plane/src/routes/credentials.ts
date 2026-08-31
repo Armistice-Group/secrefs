@@ -63,10 +63,10 @@ export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext):
       return reply.code(400).send({ error: "alias and path are required" });
     }
 
-    const decision = authorize(ctx.repo, { orgId: identity.org_id, serviceIdentityId: identity.id, alias, path });
+    const decision = await authorize(ctx.repo, { orgId: identity.org_id, serviceIdentityId: identity.id, alias, path });
 
     if (!decision.allowed) {
-      ctx.repo.recordAuthorizationEvent({
+      await ctx.repo.recordAuthorizationEvent({
         orgId: identity.org_id,
         serviceIdentityId: identity.id,
         vaultConnectionId: decision.connectionId,
@@ -81,7 +81,7 @@ export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext):
     try {
       const resolved = await resolveCredential(ctx, decision.connection, path, decision.ttlSeconds);
 
-      ctx.repo.recordAuthorizationEvent({
+      await ctx.repo.recordAuthorizationEvent({
         orgId: identity.org_id,
         serviceIdentityId: identity.id,
         vaultConnectionId: decision.connection.id,
@@ -97,7 +97,7 @@ export function registerCredentialRoutes(app: FastifyInstance, ctx: AppContext):
       // gets an audit trail entry, and the caller still never sees a
       // partial/garbage credential.
       const message = err instanceof Error ? err.message : String(err);
-      ctx.repo.recordAuthorizationEvent({
+      await ctx.repo.recordAuthorizationEvent({
         orgId: identity.org_id,
         serviceIdentityId: identity.id,
         vaultConnectionId: decision.connection.id,

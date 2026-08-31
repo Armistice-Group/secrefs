@@ -64,93 +64,65 @@ export interface OidcBinding {
 export class ControlPlaneRepo {
   constructor(private readonly db: ControlPlaneDb) {}
 
-  createOrganization(name: string): Organization {
+  async createOrganization(name: string): Promise<Organization> {
     const id = randomUUID();
-    this.db
-      .prepare("INSERT INTO organizations (id, name) VALUES (?, ?)")
-      .run(id, name);
+    await this.db.run("INSERT INTO organizations (id, name) VALUES (?, ?)", [id, name]);
     return { id, name, plan: "free" };
   }
 
-  findOrganizationById(id: string): Organization | undefined {
-    return this.db.prepare("SELECT id, name, plan FROM organizations WHERE id = ?").get(id) as
+  async findOrganizationById(id: string): Promise<Organization | undefined> {
+    return await this.db.get("SELECT id, name, plan FROM organizations WHERE id = ?", [id]) as
       | Organization
       | undefined;
   }
 
   /** Registers `workOsUserId` as an admin of `orgId` - idempotent, so
    * calling it again for the same pair is a no-op rather than an error. */
-  createOrgAdmin(orgId: string, workOsUserId: string, email?: string): OrgAdmin {
+  async createOrgAdmin(orgId: string, workOsUserId: string, email?: string): Promise<OrgAdmin> {
     const id = randomUUID();
-    this.db
-      .prepare(
-        "INSERT OR IGNORE INTO org_admins (id, org_id, workos_user_id, email) VALUES (?, ?, ?, ?)",
-      )
-      .run(id, orgId, workOsUserId, email ?? null);
+    await this.db.run("INSERT INTO org_admins (id, org_id, workos_user_id, email) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING", [id, orgId, workOsUserId, email ?? null]);
     return (
-      (this.db
-        .prepare("SELECT id, org_id, workos_user_id, email FROM org_admins WHERE org_id = ? AND workos_user_id = ?")
-        .get(orgId, workOsUserId) as OrgAdmin | undefined) ?? { id, org_id: orgId, workos_user_id: workOsUserId, email: email ?? null }
+      (await this.db.get("SELECT id, org_id, workos_user_id, email FROM org_admins WHERE org_id = ? AND workos_user_id = ?", [orgId, workOsUserId]) as OrgAdmin | undefined) ?? { id, org_id: orgId, workos_user_id: workOsUserId, email: email ?? null }
     );
   }
 
-  isOrgAdmin(workOsUserId: string, orgId: string): boolean {
-    const row = this.db
-      .prepare("SELECT 1 FROM org_admins WHERE workos_user_id = ? AND org_id = ?")
-      .get(workOsUserId, orgId);
+  async isOrgAdmin(workOsUserId: string, orgId: string): Promise<boolean> {
+    const row = await this.db.get("SELECT 1 FROM org_admins WHERE workos_user_id = ? AND org_id = ?", [workOsUserId, orgId]);
     return row !== undefined;
   }
 
   /** Every org a given WorkOS user administers - powers an admin
    * console's org switcher/landing page. */
-  listOrganizationsForAdmin(workOsUserId: string): Organization[] {
-    return this.db
-      .prepare(
-        `SELECT o.id, o.name, o.plan FROM organizations o
+  async listOrganizationsForAdmin(workOsUserId: string): Promise<Organization[]> {
+    return await this.db.all(`SELECT o.id, o.name, o.plan FROM organizations o
          JOIN org_admins a ON a.org_id = o.id
          WHERE a.workos_user_id = ?
-         ORDER BY o.name`,
-      )
-      .all(workOsUserId) as Organization[];
+         ORDER BY o.name`, [workOsUserId]) as Organization[];
   }
 
   /** Returns the created row plus the plaintext bootstrap token - the only
    * time it is ever available. Only its hash is persisted. */
-  createServiceIdentity(orgId: string, name: string, tokenHash: string): ServiceIdentity {
+  async createServiceIdentity(orgId: string, name: string, tokenHash: string): Promise<ServiceIdentity> {
     const id = randomUUID();
-    this.db
-      .prepare(
-        "INSERT INTO service_identities (id, org_id, name, bootstrap_token_hash) VALUES (?, ?, ?, ?)",
-      )
-      .run(id, orgId, name, tokenHash);
+    await this.db.run("INSERT INTO service_identities (id, org_id, name, bootstrap_token_hash) VALUES (?, ?, ?, ?)", [id, orgId, name, tokenHash]);
     return { id, org_id: orgId, name };
   }
 
-  findServiceIdentityByTokenHash(tokenHash: string): ServiceIdentity | undefined {
-    return this.db
-      .prepare("SELECT id, org_id, name FROM service_identities WHERE bootstrap_token_hash = ?")
-      .get(tokenHash) as ServiceIdentity | undefined;
+  async findServiceIdentityByTokenHash(tokenHash: string): Promise<ServiceIdentity | undefined> {
+    return await this.db.get("SELECT id, org_id, name FROM service_identities WHERE bootstrap_token_hash = ?", [tokenHash]) as ServiceIdentity | undefined;
   }
 
-  findServiceIdentityById(id: string): ServiceIdentity | undefined {
-    return this.db
-      .prepare("SELECT id, org_id, name FROM service_identities WHERE id = ?")
-      .get(id) as ServiceIdentity | undefined;
+  async findServiceIdentityById(id: string): Promise<ServiceIdentity | undefined> {
+    return await this.db.get("SELECT id, org_id, name FROM service_identities WHERE id = ?", [id]) as ServiceIdentity | undefined;
   }
 
-  listServiceIdentities(orgId: string): ServiceIdentity[] {
-    return this.db
-      .prepare("SELECT id, org_id, name FROM service_identities WHERE org_id = ? ORDER BY name")
-      .all(orgId) as ServiceIdentity[];
+  async listServiceIdentities(orgId: string): Promise<ServiceIdentity[]> {
+    return await this.db.all("SELECT id, org_id, name FROM service_identities WHERE org_id = ? ORDER BY name", [orgId]) as ServiceIdentity[];
   }
 
-  createOidcBinding(serviceIdentityId: string, issuer: string, subjectPattern: string): OidcBinding {
+  async createOidcBinding(serviceIdentityId: string, issuer: string, subjectPattern: string): Promise<OidcBinding> {
     const id = randomUUID();
-    this.db
-      .prepare(
-        "INSERT INTO oidc_bindings (id, service_identity_id, issuer, subject_pattern) VALUES (?, ?, ?, ?)",
-      )
-      .run(id, serviceIdentityId, issuer, subjectPattern);
+    await this.db.run("INSERT INTO oidc_bindings (id, service_identity_id, issuer, subject_pattern) VALUES (?, ?, ?, ?)", [id, serviceIdentityId, issuer, subjectPattern]);
     return { id, service_identity_id: serviceIdentityId, issuer, subject_pattern: subjectPattern };
   }
 
@@ -158,118 +130,92 @@ export class ControlPlaneRepo {
    * candidate set OIDC principal resolution filters by subject-pattern
    * match (see auth/principal.ts). Small in practice (bindings per issuer,
    * not per request), and indexed on `issuer`. */
-  findOidcBindingsByIssuer(issuer: string): OidcBinding[] {
-    return this.db
-      .prepare(
-        "SELECT id, service_identity_id, issuer, subject_pattern FROM oidc_bindings WHERE issuer = ?",
-      )
-      .all(issuer) as OidcBinding[];
+  async findOidcBindingsByIssuer(issuer: string): Promise<OidcBinding[]> {
+    return await this.db.all("SELECT id, service_identity_id, issuer, subject_pattern FROM oidc_bindings WHERE issuer = ?", [issuer]) as OidcBinding[];
   }
 
-  createVaultConnection(
+  async createVaultConnection(
     orgId: string,
     provider: VaultProviderKind,
     alias: string,
     encryptedCredential: string,
-  ): VaultConnection {
+  ): Promise<VaultConnection> {
     const id = randomUUID();
-    this.db
-      .prepare(
-        "INSERT INTO vault_connections (id, org_id, provider, alias, encrypted_credential) VALUES (?, ?, ?, ?, ?)",
-      )
-      .run(id, orgId, provider, alias, encryptedCredential);
+    await this.db.run("INSERT INTO vault_connections (id, org_id, provider, alias, encrypted_credential) VALUES (?, ?, ?, ?, ?)", [id, orgId, provider, alias, encryptedCredential]);
     return { id, org_id: orgId, provider, alias, encrypted_credential: encryptedCredential };
   }
 
-  findVaultConnectionByAlias(orgId: string, alias: string): VaultConnection | undefined {
-    return this.db
-      .prepare(
-        "SELECT id, org_id, provider, alias, encrypted_credential FROM vault_connections WHERE org_id = ? AND alias = ?",
-      )
-      .get(orgId, alias) as VaultConnection | undefined;
+  async findVaultConnectionByAlias(orgId: string, alias: string): Promise<VaultConnection | undefined> {
+    return await this.db.get("SELECT id, org_id, provider, alias, encrypted_credential FROM vault_connections WHERE org_id = ? AND alias = ?", [orgId, alias]) as VaultConnection | undefined;
   }
 
-  countVaultConnections(orgId: string): number {
-    const row = this.db
-      .prepare("SELECT COUNT(*) as n FROM vault_connections WHERE org_id = ?")
-      .get(orgId) as { n: number };
-    return row.n;
+  async countVaultConnections(orgId: string): Promise<number> {
+    const row = (await this.db.get("SELECT COUNT(*) as n FROM vault_connections WHERE org_id = ?", [
+      orgId,
+    ])) as { n: number | string };
+    // Postgres COUNT(*) is a bigint, which node-postgres returns as a
+    // *string* rather than lose precision past 2^53. SQLite returns a
+    // number. Normalize here so callers (the free-tier limit check in
+    // routes/connections.ts) get the number the signature promises,
+    // instead of a string that happens to survive `>=` by coercion and
+    // would break the moment anyone did arithmetic on it.
+    return Number(row.n);
   }
 
   /** For an admin console listing - deliberately omits `encrypted_credential`
    * (the query never selects it, not just "the route strips it later") so
    * there's no code path where a future change could accidentally leak it
    * into a response. */
-  listVaultConnections(orgId: string): Omit<VaultConnection, "encrypted_credential">[] {
-    return this.db
-      .prepare("SELECT id, org_id, provider, alias FROM vault_connections WHERE org_id = ? ORDER BY alias")
-      .all(orgId) as Omit<VaultConnection, "encrypted_credential">[];
+  async listVaultConnections(orgId: string): Promise<Omit<VaultConnection, "encrypted_credential">[]> {
+    return await this.db.all("SELECT id, org_id, provider, alias FROM vault_connections WHERE org_id = ? ORDER BY alias", [orgId]) as Omit<VaultConnection, "encrypted_credential">[];
   }
 
-  createRole(orgId: string, name: string): Role {
+  async createRole(orgId: string, name: string): Promise<Role> {
     const id = randomUUID();
-    this.db.prepare("INSERT INTO roles (id, org_id, name) VALUES (?, ?, ?)").run(id, orgId, name);
+    await this.db.run("INSERT INTO roles (id, org_id, name) VALUES (?, ?, ?)", [id, orgId, name]);
     return { id, org_id: orgId, name };
   }
 
-  findRoleById(id: string): Role | undefined {
-    return this.db.prepare("SELECT id, org_id, name FROM roles WHERE id = ?").get(id) as Role | undefined;
+  async findRoleById(id: string): Promise<Role | undefined> {
+    return await this.db.get("SELECT id, org_id, name FROM roles WHERE id = ?", [id]) as Role | undefined;
   }
 
-  listRoles(orgId: string): Role[] {
-    return this.db
-      .prepare("SELECT id, org_id, name FROM roles WHERE org_id = ? ORDER BY name")
-      .all(orgId) as Role[];
+  async listRoles(orgId: string): Promise<Role[]> {
+    return await this.db.all("SELECT id, org_id, name FROM roles WHERE org_id = ? ORDER BY name", [orgId]) as Role[];
   }
 
-  bindServiceIdentityToRole(roleId: string, serviceIdentityId: string): void {
-    this.db
-      .prepare(
-        "INSERT OR IGNORE INTO role_bindings (role_id, service_identity_id) VALUES (?, ?)",
-      )
-      .run(roleId, serviceIdentityId);
+  async bindServiceIdentityToRole(roleId: string, serviceIdentityId: string): Promise<void> {
+    await this.db.run("INSERT INTO role_bindings (role_id, service_identity_id) VALUES (?, ?) ON CONFLICT DO NOTHING", [roleId, serviceIdentityId]);
   }
 
-  createGrant(
+  async createGrant(
     roleId: string,
     vaultConnectionId: string,
     pathPattern: string,
     maxTtlSeconds: number,
-  ): Grant {
+  ): Promise<Grant> {
     const id = randomUUID();
-    this.db
-      .prepare(
-        "INSERT INTO grants (id, role_id, vault_connection_id, path_pattern, max_ttl_seconds) VALUES (?, ?, ?, ?, ?)",
-      )
-      .run(id, roleId, vaultConnectionId, pathPattern, maxTtlSeconds);
+    await this.db.run("INSERT INTO grants (id, role_id, vault_connection_id, path_pattern, max_ttl_seconds) VALUES (?, ?, ?, ?, ?)", [id, roleId, vaultConnectionId, pathPattern, maxTtlSeconds]);
     return { id, role_id: roleId, vault_connection_id: vaultConnectionId, path_pattern: pathPattern, max_ttl_seconds: maxTtlSeconds };
   }
 
-  listGrantsForRole(roleId: string): Grant[] {
-    return this.db
-      .prepare(
-        "SELECT id, role_id, vault_connection_id, path_pattern, max_ttl_seconds FROM grants WHERE role_id = ?",
-      )
-      .all(roleId) as Grant[];
+  async listGrantsForRole(roleId: string): Promise<Grant[]> {
+    return await this.db.all("SELECT id, role_id, vault_connection_id, path_pattern, max_ttl_seconds FROM grants WHERE role_id = ?", [roleId]) as Grant[];
   }
 
   /** Every grant reachable by a service identity for one vault connection,
    * via any role it's bound to - the candidate set RBAC matching runs over. */
-  grantsForServiceIdentityAndConnection(
+  async grantsForServiceIdentityAndConnection(
     serviceIdentityId: string,
     vaultConnectionId: string,
-  ): Grant[] {
-    return this.db
-      .prepare(
-        `SELECT g.id, g.role_id, g.vault_connection_id, g.path_pattern, g.max_ttl_seconds
+  ): Promise<Grant[]> {
+    return await this.db.all(`SELECT g.id, g.role_id, g.vault_connection_id, g.path_pattern, g.max_ttl_seconds
          FROM grants g
          JOIN role_bindings rb ON rb.role_id = g.role_id
-         WHERE rb.service_identity_id = ? AND g.vault_connection_id = ?`,
-      )
-      .all(serviceIdentityId, vaultConnectionId) as Grant[];
+         WHERE rb.service_identity_id = ? AND g.vault_connection_id = ?`, [serviceIdentityId, vaultConnectionId]) as Grant[];
   }
 
-  recordAuthorizationEvent(event: {
+  async recordAuthorizationEvent(event: {
     orgId: string;
     serviceIdentityId: string;
     vaultConnectionId: string | null;
@@ -277,14 +223,12 @@ export class ControlPlaneRepo {
     path: string;
     decision: "allow" | "deny";
     reason?: string;
-  }): void {
-    this.db
-      .prepare(
-        `INSERT INTO authorization_events
+  }): Promise<void> {
+    await this.db.run(
+      `INSERT INTO authorization_events
            (id, org_id, service_identity_id, vault_connection_id, alias, path, decision, reason)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
+      [
         randomUUID(),
         event.orgId,
         event.serviceIdentityId,
@@ -293,15 +237,12 @@ export class ControlPlaneRepo {
         event.path,
         event.decision,
         event.reason ?? null,
-      );
+      ],
+    );
   }
 
-  listAuthorizationEvents(orgId: string, limit = 100): unknown[] {
-    return this.db
-      .prepare(
-        `SELECT id, service_identity_id, vault_connection_id, alias, path, decision, reason, requested_at
-         FROM authorization_events WHERE org_id = ? ORDER BY requested_at DESC LIMIT ?`,
-      )
-      .all(orgId, limit);
+  async listAuthorizationEvents(orgId: string, limit = 100): Promise<unknown[]> {
+    return await this.db.all(`SELECT id, service_identity_id, vault_connection_id, alias, path, decision, reason, requested_at
+         FROM authorization_events WHERE org_id = ? ORDER BY requested_at DESC LIMIT ?`, [orgId, limit]);
   }
 }

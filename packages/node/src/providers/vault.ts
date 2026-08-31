@@ -1,4 +1,5 @@
 import vaultFactory from "node-vault";
+import { TtlCache } from "../ttlCache.js";
 import {
   BaseSecretProvider,
   errorMessage,
@@ -14,6 +15,10 @@ export interface VaultProviderOptions {
   token?: string;
   /** Inject a pre-configured client (primarily for testing). */
   client?: ReturnType<typeof vaultFactory>;
+  /** How long a fetched secret may be reused, in ms. Defaults to 0 -
+   * every expansion re-fetches, so rotation reaches a long-running
+   * consumer without a redeploy. See ../ttlCache.ts. */
+  cacheTtlMs?: number;
 }
 
 /**
@@ -33,13 +38,14 @@ export class VaultProvider extends BaseSecretProvider {
   private readonly endpoint?: string;
   private readonly token?: string;
   private client: ReturnType<typeof vaultFactory> | null = null;
-  private readonly dataCache = new Map<string, Promise<Record<string, unknown>>>();
+  private readonly dataCache: TtlCache<Record<string, unknown>>;
 
   constructor(options: VaultProviderOptions = {}) {
     super();
     this.explicitClient = options.client;
     this.endpoint = options.endpoint ?? process.env.VAULT_ADDR;
     this.token = options.token ?? process.env.VAULT_TOKEN;
+    this.dataCache = new TtlCache<Record<string, unknown>>({ ttlMs: options.cacheTtlMs });
   }
 
   private getClient(): ReturnType<typeof vaultFactory> {
@@ -58,10 +64,8 @@ export class VaultProvider extends BaseSecretProvider {
   }
 
   private getData(path: string): Promise<Record<string, unknown>> {
-    const cached = this.dataCache.get(path);
-    if (cached) return cached;
-
-    const pending = this.getClient()
+    return this.dataCache.fetch(path, () =>
+      this.getClient()
       .read(path)
       .then((response) => {
         const outer = response.data;
@@ -80,12 +84,9 @@ export class VaultProvider extends BaseSecretProvider {
         return outer as Record<string, unknown>;
       })
       .catch((err: unknown) => {
-        this.dataCache.delete(path);
         throw new Error(`could not read Vault path "${path}": ${errorMessage(err)}`);
-      });
-
-    this.dataCache.set(path, pending);
-    return pending;
+      }),
+    );
   }
 
   async fetchOne(request: SecretFetchRequest): Promise<string> {

@@ -52,7 +52,19 @@ const corsOrigins = (process.env.SECREFS_CP_CORS_ORIGINS ?? "")
   .map((o) => o.trim())
   .filter(Boolean);
 
-const db = openDatabase(DB_PATH);
+// Postgres when DATABASE_URL is set (hosted deployments - see infra/),
+// otherwise the SQLite file at SECREFS_CP_DB_PATH. Nothing to switch on:
+// having provisioned a database is the signal that you meant to use it.
+const databaseUrl = process.env.DATABASE_URL;
+// Off only for a local Postgres container with a self-signed cert. Never
+// set this against RDS - it disables server certificate verification.
+const databaseSsl = process.env.SECREFS_CP_DB_SSL !== "false";
+
+const db = await openDatabase({
+  databaseUrl,
+  sqlitePath: DB_PATH,
+  ssl: databaseSsl,
+});
 const ctx = createContext(db, cipher, { oidcConfig, workOsConfig });
 const app = buildApp(ctx, { corsOrigins });
 
@@ -64,8 +76,10 @@ app
       : ", OIDC: not configured (bootstrap tokens only)";
     const adminNote = workOsConfig ? ", admin auth: WorkOS" : ", admin auth: NONE (see warning above)";
     const corsNote = corsOrigins.length ? `, CORS: ${corsOrigins.join(", ")}` : "";
+    // Never log DATABASE_URL itself - it carries the password.
+    const dbNote = databaseUrl ? "postgres" : DB_PATH;
     console.log(
-      `secrefs control plane listening on :${PORT} (db: ${DB_PATH}${oidcNote}${adminNote}${corsNote})`,
+      `secrefs control plane listening on :${PORT} (db: ${dbNote}${oidcNote}${adminNote}${corsNote})`,
     );
   })
   .catch((err) => {

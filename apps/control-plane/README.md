@@ -86,6 +86,7 @@ Or for local iteration: `pnpm --filter @secrefs/control-plane dev` (same
 | `SECREFS_CP_OIDC_AUDIENCE` | — | Required if any OIDC issuer above is configured — the `aud` claim every trusted token must carry |
 | `WORKOS_API_KEY` | — | Enables admin auth on every management endpoint (together with `WORKOS_CLIENT_ID`) — see "Admin auth" below. Either unset means those endpoints are open; the server prints a warning at boot when this is the case. |
 | `WORKOS_CLIENT_ID` | — | Your AuthKit client id — identifies which JWKS to verify admin session tokens against. |
+| `SECREFS_CP_CORS_ORIGINS` | — | Comma-separated origins the [admin console](../control-plane-admin) is served from, e.g. `http://localhost:3001`. Unset means no CORS headers at all — correct unless you're running the console. Explicit allowlist, no wildcard. |
 
 ## Admin auth
 
@@ -184,6 +185,7 @@ service-identity/OIDC auth, unchanged.
 |---|---|---|
 | `POST /v1/organizations` | admin (bootstrap) | Create an org — the creator becomes its founding admin |
 | `GET /v1/organizations` | admin | List orgs the caller administers |
+| `GET /v1/organizations/:orgId` | admin | One org by id — lets the console name the org you're viewing |
 | `POST /v1/service-identities` | admin | Create a machine principal; response includes the bootstrap token **once** |
 | `GET /v1/service-identities?orgId=` | admin | List an org's service identities |
 | `POST /v1/service-identities/:id/oidc-bindings` | admin | Trust a CI job's OIDC identity instead of (or alongside) a bootstrap token — `{ issuer, subjectPattern }`, `subjectPattern` matched against the token's `sub` claim with the same glob-lite rules as `Grant.path_pattern` |
@@ -195,7 +197,8 @@ service-identity/OIDC auth, unchanged.
 | `POST /v1/roles/:roleId/grants` | admin | Grant a role access to a connection, scoped to a `pathPattern` (see `src/rbac/match.ts`) |
 | `GET /v1/roles/:roleId/grants` | admin | List a role's grants |
 | `POST /v1/credentials/mint` | service identity / OIDC | `{ alias, path }` → a resolved credential (freshly scoped for AWS, distributed as-is for Bitwarden — see above), or a `403` with why not |
-| `GET /v1/audit` | service identity / OIDC | This org's `AuthorizationEvent` log |
+| `GET /v1/audit` | service identity / OIDC **or** admin | This org's `AuthorizationEvent` log. A machine token scopes to its own org; an admin passes `?orgId=` (a human session isn't tied to one org). |
+| `GET /v1/config` | none | Which auth modes this control plane has configured. Unauthenticated by design — the console reads it *before* it can know whether to show a login. Booleans only, never keys or issuers. |
 
 ## Tests
 

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../context.js";
 import { resolveAdminPrincipal } from "../auth/adminPrincipal.js";
+import { requireOrgAdmin } from "../auth/requireOrgAdmin.js";
 
 export function registerOrganizationRoutes(app: FastifyInstance, ctx: AppContext): void {
   // The one bootstrap case: creating a *new* org has no existing
@@ -36,5 +37,19 @@ export function registerOrganizationRoutes(app: FastifyInstance, ctx: AppContext
       return reply.code(401).send({ error: "missing or unrecognized admin session token" });
     }
     return reply.send({ organizations: ctx.repo.listOrganizationsForAdmin(admin.workOsUserId) });
+  });
+
+  // One org by id. Unlike the list above this works in no-auth mode too,
+  // since it identifies the org explicitly rather than deriving it from
+  // a signed-in admin - it's what lets the console name the org you're
+  // looking at instead of showing a bare UUID.
+  app.get<{ Params: { orgId: string } }>("/v1/organizations/:orgId", async (request, reply) => {
+    const { orgId } = request.params;
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
+    if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
+
+    const org = ctx.repo.findOrganizationById(orgId);
+    if (!org) return reply.code(404).send({ error: `no organization "${orgId}"` });
+    return reply.send(org);
   });
 }

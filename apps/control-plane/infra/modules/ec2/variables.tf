@@ -9,6 +9,28 @@ variable "public_subnet_ids" {
   type        = list(string)
 }
 
+variable "public_instance" {
+  description = <<-EOT
+    Place the instance in a public subnet with a public IP, reached
+    outbound via the internet gateway, instead of a private subnet behind
+    a NAT gateway.
+
+    True (the default) is what the rest of this portfolio does and costs
+    roughly $99/month less: no NAT gateway, and no interface VPC
+    endpoints needed for SSM or the AWS APIs the app calls. The instance
+    is routable, but its security group still admits nothing except the
+    app port from the ALB, so it is not reachable as a service.
+
+    False is the stronger posture and the right end state for a service
+    brokering other organisations' credentials: the box is structurally
+    unreachable rather than reachable-but-firewalled. It requires
+    enable_nat_gateway or enable_vpc_endpoints to be on, or the instance
+    cannot fetch its image, its secrets, or the RDS CA bundle.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "private_subnet_id" {
   description = "Private subnet the single application instance runs in."
   type        = string

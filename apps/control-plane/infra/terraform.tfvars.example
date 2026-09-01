@@ -12,14 +12,15 @@ api_domain = "api.secrefs.com"
 # fall back to the static SECREFS_CP_CIPHER_KEY out of Secrets Manager.
 # enable_kms_cipher = true
 
-# ~$33/mo. Required for the RDS CA bundle at boot, WorkOS admin auth, and
-# OIDC JWKS fetches — see variables.tf. (Bitwarden connections need no
-# outbound call; the control plane returns the stored token.)
-# enable_nat_gateway = true
+# Hardening, off by default (~$99/mo combined). Set public_instance = false
+# together with at least one of these to make the box structurally
+# unreachable rather than reachable-but-firewalled. Terraform refuses to
+# plan a private instance with no egress path at all.
+# public_instance      = false
+# enable_nat_gateway   = true
 
-# ~$66/mo for nine interface endpoints. Keeps Secrets Manager / KMS / STS
-# traffic off the public internet entirely; also what lets the instance
-# boot with enable_nat_gateway = false.
+# ~$66/mo for seven interface endpoints. Keeps Secrets Manager / KMS / STS
+# traffic off the public internet entirely.
 # enable_vpc_endpoints = true
 
 # Set true before this holds anything you would mind losing.

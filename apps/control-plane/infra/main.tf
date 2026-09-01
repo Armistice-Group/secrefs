@@ -163,6 +163,7 @@ module "ec2" {
   vpc_id              = aws_vpc.main.id
   public_subnet_ids   = [for k in ["a", "b"] : aws_subnet.public[k].id]
   private_subnet_id   = aws_subnet.private["a"].id
+  public_instance     = var.public_instance
   sg_alb_id           = aws_security_group.alb.id
   acm_certificate_arn = module.dns.certificate_arn
 

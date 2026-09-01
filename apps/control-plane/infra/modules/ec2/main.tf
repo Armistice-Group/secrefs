@@ -258,11 +258,15 @@ resource "aws_security_group" "ec2" {
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
-  subnet_id              = var.private_subnet_id
+  subnet_id              = var.public_instance ? var.public_subnet_ids[0] : var.private_subnet_id
   vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
-  associate_public_ip_address = false
+  # A public IP is what lets a public-subnet instance reach ECR, Secrets
+  # Manager, SSM and the RDS CA bundle through the internet gateway
+  # instead of a NAT gateway. The security group is unchanged either way:
+  # the app port is reachable from the ALB and nothing else.
+  associate_public_ip_address = var.public_instance
 
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
     aws_region         = var.aws_region

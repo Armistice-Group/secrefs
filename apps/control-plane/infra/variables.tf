@@ -106,6 +106,28 @@ variable "ec2_root_volume_gb" {
 
 # ── Networking ────────────────────────────────────────────────────────────────
 
+variable "alb_allowed_cidrs" {
+  description = <<-EOT
+    Who can reach the load balancer. Defaults to the whole internet,
+    which is what a launched API wants.
+
+    Narrow it to your own address for the window between the first apply
+    and setting real WORKOS_* secrets. Until those are set the app boots
+    with every management endpoint UNAUTHENTICATED - anyone who can reach
+    it can create orgs, connections, roles and grants - and a warning on
+    stdout is the only thing marking that. This variable is how you make
+    that window structural rather than something you have to hurry
+    through.
+  EOT
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+
+  validation {
+    condition     = length(var.alb_allowed_cidrs) > 0
+    error_message = "alb_allowed_cidrs must list at least one CIDR; an empty list would create a load balancer nothing can reach."
+  }
+}
+
 variable "public_instance" {
   description = <<-EOT
     Place the app instance in a public subnet with a public IP rather

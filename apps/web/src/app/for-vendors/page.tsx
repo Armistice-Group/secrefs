@@ -70,8 +70,8 @@ const COSTS = [
   },
   {
     icon: Database,
-    title: "Plaintext transits our infrastructure",
-    body: "In proxy mode the value passes through SecRefs in memory to reach you. We never write it to a database, a cache, or a log line - that prohibition is the design's central invariant - but it is a change from the broker model, and pretending otherwise would be the wrong way to earn a security team's trust.",
+    title: "The value passes through us",
+    body: "Responses are encrypted to a public key you enrol, so the plaintext never reaches a log, a load balancer, or anything else that terminates TLS. But resolving still means fetching from your customer's vault into our memory - so the honest claim is a smaller exposure window, not zero. Code execution on our resolve path would still see it.",
   },
 ];
 
@@ -172,6 +172,17 @@ export default function ForVendorsPage() {
           A plain value passed to <code className="text-signal-400">expandString</code> comes back
           unchanged, so you can accept both and migrate customers gradually rather than flag-day
           your whole integration surface.
+        </p>
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500">
+          Enrolling also means registering a public key. Responses are sealed to it with{" "}
+          <a
+            href="https://www.rfc-editor.org/rfc/rfc9180"
+            className="text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-white"
+          >
+            HPKE
+          </a>
+          , bound to the specific reference being resolved, so a response cannot be replayed as
+          the answer to a different one. The SDK unseals it; your code sees a string.
         </p>
       </section>
 

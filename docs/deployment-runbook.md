@@ -166,8 +166,17 @@ cors_origins = ["https://app.secrefs.com"]
 ## Known sharp edges
 
 - **The `REPLACE_ME` window.** Between 2a and 2c the API is live and
-  unauthenticated. Keep it short, and don't publish the domain until
-  `/v1/config` reports `adminAuthRequired: true`.
+  unauthenticated — anyone who reaches it can create orgs, connections,
+  roles and grants. If you can't set the WorkOS secrets in the same
+  sitting, close the window structurally rather than hurrying through it:
+
+  ```hcl
+  # terraform.tfvars — only your address can reach the ALB
+  alb_allowed_cidrs = ["<your.ip>/32"]
+  ```
+
+  Remove it (or set `["0.0.0.0/0"]`) and re-apply once `/v1/config`
+  reports `adminAuthRequired: true`.
 - **The instance needs egress at boot**, not just at runtime: it fetches
   its image from ECR, its secrets from Secrets Manager, and Amazon's RDS
   CA bundle to verify the database's TLS certificate. On the default

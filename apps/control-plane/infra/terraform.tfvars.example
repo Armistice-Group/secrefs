@@ -4,6 +4,13 @@
 
 api_domain = "api.secrefs.com"
 
+# Who can reach the load balancer. Leave unset (the whole internet) for a
+# launched API. Narrow it to your own address for the window between the
+# first apply and setting real WORKOS_* secrets — until those exist the
+# app boots with every management endpoint unauthenticated.
+#   curl -s https://checkip.amazonaws.com   → your current address
+# alb_allowed_cidrs = ["203.0.113.4/32"]
+
 # Origins the admin console is served from. Leave empty until it exists —
 # an empty list means the app emits no CORS headers at all.
 # cors_origins = ["https://admin.secrefs.com"]

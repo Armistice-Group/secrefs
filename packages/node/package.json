@@ -21,7 +21,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "secrefs": "./dist/secrefs.cjs"
+    "secrefs": "dist/secrefs.cjs"
   },
   "files": [
     "dist",

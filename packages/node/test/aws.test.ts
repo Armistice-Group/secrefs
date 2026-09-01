@@ -95,9 +95,16 @@ describe("AwsSecretsManagerProvider - control-plane mode", () => {
       controlPlane: { baseUrl: "https://cp.example.com", token: "sfcp_test", alias: "aws-prod", client: controlPlaneClient },
     });
 
-    await provider.fetchOne({ path: "prod/db" }).catch(() => {});
+    // Deliberately not awaited. fetchOne builds a real SecretsManagerClient
+    // from the minted credentials and calls AWS, which fails - but only
+    // after the SDK exhausts its retry/backoff schedule. Awaiting that made
+    // this test depend on the runner's network and time out intermittently
+    // in CI while passing locally. The mint is awaited internally before the
+    // client is constructed, so it is observable well before the doomed call
+    // settles.
+    void provider.fetchOne({ path: "prod/db" }).catch(() => {});
 
-    expect(mintSpy).toHaveBeenCalledWith("aws-prod", "prod/db");
+    await vi.waitFor(() => expect(mintSpy).toHaveBeenCalledWith("aws-prod", "prod/db"));
   });
 
   it("throws a clear error if the control plane returns a non-aws credential for this alias", async () => {

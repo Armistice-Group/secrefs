@@ -7,12 +7,14 @@ import {
   KeyRound,
   Lock,
   Server,
+  Shield,
   ShieldCheck,
   Terminal as TerminalIcon,
   Workflow,
   X,
 } from "lucide-react";
 import Sandbox from "@/components/Sandbox";
+import MobileNav from "@/components/MobileNav";
 
 function TerminalWindow({
   title,
@@ -52,21 +54,35 @@ const PROVIDERS = [
   {
     icon: Cloud,
     name: "AWS Secrets Manager",
-    alias: "sec://aws/...",
+    alias: "sec://aws/prod/db#password",
     detail: "Ambient AWS credentials or an IAM role - never a static key in your config.",
   },
   {
     icon: Server,
     name: "HashiCorp Vault",
-    alias: "sec://vault/...",
+    alias: "sec://vault/kv/stripe#key",
     detail: "KV v1 & v2, authenticated via VAULT_ADDR / VAULT_TOKEN already in your environment.",
+  },
+  {
+    icon: Shield,
+    name: "Bitwarden Secrets Manager",
+    alias: "sec://bitwarden/stripe-key",
+    detail:
+      "End-to-end encrypted, decrypted client-side via a machine account token. Address a secret by name or UUID. Self-hosted instances supported.",
   },
   {
     icon: KeyRound,
     name: "Local (dev only)",
-    alias: "sec://local/...",
+    alias: "sec://local/mock-db#password",
     detail: "A gitignored .secrefs.local.json for teammates who don't have vault access yet.",
   },
+];
+
+const NAV_LINKS = [
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#providers", label: "Providers" },
+  { href: "#sandbox", label: "Sandbox" },
+  { href: "#quickstart", label: "Quickstart" },
 ];
 
 const HOW_IT_WORKS = [
@@ -101,33 +117,34 @@ export default function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-grid bg-grid [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,black,transparent)]" />
 
       {/* Nav */}
-      <header className="relative z-10 border-b border-white/5">
+      {/* `relative` anchors the mobile nav panel, which positions itself
+          against this header rather than the viewport. z-30, not z-10:
+          z-10 creates a stacking context here, so the panel's own z-20
+          cannot escape it, and the hero section - a later sibling also at
+          z-10 - painted straight over the open menu. */}
+      <header className="relative z-30 border-b border-white/5">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <div className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight text-white">
             <TerminalIcon className="h-4 w-4 text-signal-400" />
             secrefs
           </div>
           <nav className="hidden items-center gap-8 text-sm text-slate-400 sm:flex">
-            <a href="#how-it-works" className="hover:text-white">
-              How it works
-            </a>
-            <a href="#providers" className="hover:text-white">
-              Providers
-            </a>
-            <a href="#sandbox" className="hover:text-white">
-              Sandbox
-            </a>
-            <a href="#quickstart" className="hover:text-white">
-              Quickstart
-            </a>
+            {NAV_LINKS.map((link) => (
+              <a key={link.href} href={link.href} className="hover:text-white">
+                {link.label}
+              </a>
+            ))}
           </nav>
-          <a
-            href="https://github.com/Armistice-Group/secrefs"
-            className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-white/20 hover:text-white"
-          >
-            <Github className="h-3.5 w-3.5" />
-            GitHub
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://github.com/Armistice-Group/secrefs"
+              className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-white/20 hover:text-white"
+            >
+              <Github className="h-3.5 w-3.5" />
+              GitHub
+            </a>
+            <MobileNav links={NAV_LINKS} />
+          </div>
         </div>
       </header>
 
@@ -296,12 +313,19 @@ export default function HomePage() {
           <Lock className="h-6 w-6 text-signal-400" />
           <h2 className="text-3xl font-bold tracking-tight text-white">Bring your own vault</h2>
         </div>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PROVIDERS.map((provider) => (
-            <div key={provider.name} className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <provider.icon className="h-6 w-6 text-signal-400" />
-              <h3 className="mt-4 font-semibold text-white">{provider.name}</h3>
-              <code className="mt-1 block text-xs text-slate-500">{provider.alias}</code>
+            <div
+              key={provider.name}
+              className="flex flex-col rounded-xl border border-white/10 bg-white/[0.02] p-6"
+            >
+              <provider.icon className="h-6 w-6 shrink-0 text-signal-400" />
+              <h3 className="mt-4 text-balance font-semibold text-white">{provider.name}</h3>
+              {/* These are long enough to overflow a quarter-width card, so
+                  they scroll on their own rather than widening the page. */}
+              <code className="mt-1 block overflow-x-auto text-xs text-slate-500">
+                {provider.alias}
+              </code>
               <p className="mt-3 text-sm leading-relaxed text-slate-400">{provider.detail}</p>
             </div>
           ))}

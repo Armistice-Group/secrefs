@@ -63,6 +63,31 @@ export class SecRefsWebStack extends Stack {
       autoDeleteObjects: false,
     });
 
+    // `next export` writes flat files - /for-vendors becomes
+    // for-vendors.html - but S3 is a key-value store with no notion of
+    // extension resolution, so a request for /for-vendors misses and falls
+    // through to the 404 page below. Every route except "/" would be dead
+    // in production while working locally, because `next dev` and static
+    // file servers both resolve the extension for you.
+    const rewriteToHtml = new cloudfront.Function(this, "RewriteToHtml", {
+      comment: "Map extension-less paths onto the flat .html files next export writes",
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+
+  if (uri.endsWith("/")) {
+    request.uri = uri + "index.html";
+  } else if (!uri.split("/").pop().includes(".")) {
+    request.uri = uri + ".html";
+  }
+
+  return request;
+}
+      `),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       defaultRootObject: "index.html",
       domainNames: [domainName, wwwDomainName],
@@ -74,10 +99,16 @@ export class SecRefsWebStack extends Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         compress: true,
+        functionAssociations: [
+          {
+            function: rewriteToHtml,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
-      // `next export` writes flat HTML files (e.g. /providers -> providers.html),
-      // so a 403/404 from S3 for an extension-less path falls back to the
-      // static 404 page rather than CloudFront's default XML error blob.
+      // With the rewrite function above, a 403/404 here means the .html
+      // genuinely does not exist - so serve the static 404 page rather than
+      // CloudFront's default XML error blob.
       errorResponses: [
         {
           httpStatus: 403,

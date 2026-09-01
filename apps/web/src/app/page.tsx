@@ -7,6 +7,7 @@ import {
   KeyRound,
   Lock,
   Server,
+  Share2,
   Shield,
   ShieldCheck,
   Terminal as TerminalIcon,
@@ -14,41 +15,8 @@ import {
   X,
 } from "lucide-react";
 import Sandbox from "@/components/Sandbox";
-import MobileNav from "@/components/MobileNav";
-
-function TerminalWindow({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="terminal">
-      <div className="terminal-header">
-        <span className="terminal-dot bg-[#ff5f56]" />
-        <span className="terminal-dot bg-[#ffbd2e]" />
-        <span className="terminal-dot bg-[#27c93f]" />
-        <span className="ml-3 text-xs text-slate-400">{title}</span>
-      </div>
-      <div className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed sm:text-sm">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Line({ children, dim }: { children: React.ReactNode; dim?: boolean }) {
-  return <div className={dim ? "text-slate-500" : "text-slate-200"}>{children}</div>;
-}
-
-function Prompt({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="prompt text-slate-200">
-      <span>{children}</span>
-    </div>
-  );
-}
+import SiteHeader from "@/components/SiteHeader";
+import { TerminalWindow, Line, Prompt } from "@/components/Terminal";
 
 const PROVIDERS = [
   {
@@ -82,7 +50,7 @@ const NAV_LINKS = [
   { href: "#how-it-works", label: "How it works" },
   { href: "#providers", label: "Providers" },
   { href: "#sandbox", label: "Sandbox" },
-  { href: "#quickstart", label: "Quickstart" },
+  { href: "/for-vendors", label: "For vendors" },
 ];
 
 const HOW_IT_WORKS = [
@@ -116,37 +84,7 @@ export default function HomePage() {
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-grid bg-grid [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,black,transparent)]" />
 
-      {/* Nav */}
-      {/* `relative` anchors the mobile nav panel, which positions itself
-          against this header rather than the viewport. z-30, not z-10:
-          z-10 creates a stacking context here, so the panel's own z-20
-          cannot escape it, and the hero section - a later sibling also at
-          z-10 - painted straight over the open menu. */}
-      <header className="relative z-30 border-b border-white/5">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight text-white">
-            <TerminalIcon className="h-4 w-4 text-signal-400" />
-            secrefs
-          </div>
-          <nav className="hidden items-center gap-8 text-sm text-slate-400 sm:flex">
-            {NAV_LINKS.map((link) => (
-              <a key={link.href} href={link.href} className="hover:text-white">
-                {link.label}
-              </a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <a
-              href="https://github.com/Armistice-Group/secrefs"
-              className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-white/20 hover:text-white"
-            >
-              <Github className="h-3.5 w-3.5" />
-              GitHub
-            </a>
-            <MobileNav links={NAV_LINKS} />
-          </div>
-        </div>
-      </header>
+      <SiteHeader links={NAV_LINKS} />
 
       {/* Hero */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pb-20 pt-20 sm:pt-28">
@@ -163,8 +101,8 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate-400">
               SecRefs expands declarative <code className="text-signal-400">sec://</code> URIs
-              directly in memory, at runtime. No plaintext secret is ever written to disk, logged,
-              or sent to a third-party SaaS vault - because there is no third party.
+              directly in memory, at the moment they&apos;re used. Your vault stays the system of
+              record - SecRefs resolves secrets, and never stores one.
             </p>
             <div className="mt-9 flex flex-wrap items-center gap-4">
               <a
@@ -332,6 +270,54 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* The other side of the platform. Deliberately after the sandbox: a
+          visitor should understand what a reference is before being asked
+          to imagine handing one to a vendor. */}
+      <section id="pass-through" className="relative z-10 mx-auto max-w-6xl px-6 py-20">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 sm:p-10">
+          <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
+            <div>
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-signal-400">
+                <Share2 className="h-4 w-4" />
+                Pass-through
+              </div>
+              <h2 className="text-balance text-3xl font-bold tracking-tight text-white">
+                The same idea, pointed outward.
+              </h2>
+              <div className="mt-4 space-y-4 text-slate-400">
+                <p>
+                  A reference works just as well when the thing reading it isn&apos;t yours. Give a
+                  vendor <code className="text-signal-400">sec://acme/stripe#key</code> instead of
+                  the key, and they resolve it when they use it - so rotating at the source
+                  never breaks their integration, and revoking their access never touches anyone
+                  else&apos;s.
+                </p>
+                <p>
+                  Their database stops holding your credentials. Yours stays the only place the
+                  value lives.
+                </p>
+              </div>
+              <a
+                href="/for-vendors"
+                className="mt-7 inline-flex items-center gap-2 rounded-md border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/30"
+              >
+                If you&apos;re a vendor, start here
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
+
+            <TerminalWindow title="what the vendor stores">
+              <Line dim># not your key - a pointer to it</Line>
+              <Line>sec://acme/stripe#key</Line>
+              <div className="h-4" />
+              <Line dim># you rotate at the source</Line>
+              <Line dim># their next call gets the new value</Line>
+              <Line dim># nothing on their side changed</Line>
+            </TerminalWindow>
+          </div>
+        </div>
+      </section>
+
       {/* Quickstart / code examples */}
       <section id="quickstart" className="relative z-10 mx-auto max-w-6xl px-6 py-20">
         <h2 className="mb-10 text-3xl font-bold tracking-tight text-white">Quickstart</h2>
@@ -376,7 +362,10 @@ export default function HomePage() {
             <TerminalIcon className="h-4 w-4 text-signal-400" />
             secrefs.com
           </div>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-6">
+            <a href="/for-vendors" className="hover:text-white">
+              For vendors
+            </a>
             <a href="https://github.com/Armistice-Group/secrefs" className="hover:text-white">
               GitHub
             </a>

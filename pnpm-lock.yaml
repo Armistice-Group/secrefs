@@ -220,6 +220,12 @@ importers:
         specifier: ^2.1.1
         version: 2.1.9(@types/node@22.20.1)(jsdom@30.0.1)
 
+  packages/npm-alias:
+    dependencies:
+      '@secrefs/node':
+        specifier: 0.1.0
+        version: 0.1.0
+
 packages:
 
   '@adobe/css-tools@4.5.0':
@@ -1264,6 +1270,11 @@ packages:
 
   '@rushstack/eslint-patch@1.16.1':
     resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
+
+  '@secrefs/node@0.1.0':
+    resolution: {integrity: sha512-QAMB2bkB2AqVqp9xsJepwygCSbbevYqooOUN6fyV3Ci1cm4GnCbRwE2hJoaBIXTkOqmOxIrv1VlhR9eXxsIyIw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@smithy/core@3.33.3':
     resolution: {integrity: sha512-CsOeKq/9kA3y6VJHt+/+VTCtBaxJ4OTFpgrjIUhPpDIKxBci1k2bJaQASF2h/ELWrulGp+t97DZ0mevfAD8idg==}
@@ -4771,6 +4782,17 @@ snapshots:
   '@rtsao/scc@1.1.0': {}
 
   '@rushstack/eslint-patch@1.16.1': {}
+
+  '@secrefs/node@0.1.0':
+    dependencies:
+      '@aws-sdk/client-secrets-manager': 3.1121.0
+      '@bitwarden/sdk-napi': 1.0.0
+      commander: 12.1.0
+      cross-spawn: 7.0.6
+      dotenv: 16.6.1
+      node-vault: 0.10.10
+    transitivePeerDependencies:
+      - supports-color
 
   '@smithy/core@3.33.3':
     dependencies:

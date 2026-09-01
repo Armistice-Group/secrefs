@@ -146,10 +146,10 @@ export const api = {
       `/v1/service-identities?orgId=${encodeURIComponent(orgId)}`,
     ).then((r) => r.serviceIdentities),
 
-  createServiceIdentity: (orgId: string, name: string) =>
+  createServiceIdentity: (orgId: string, name: string, expiresInDays?: number) =>
     request<ServiceIdentityWithToken>("/v1/service-identities", {
       method: "POST",
-      body: JSON.stringify({ orgId, name }),
+      body: JSON.stringify({ orgId, name, ...(expiresInDays ? { expiresInDays } : {}) }),
     }),
 
   createOidcBinding: (identityId: string, input: { issuer: string; subjectPattern: string }) =>

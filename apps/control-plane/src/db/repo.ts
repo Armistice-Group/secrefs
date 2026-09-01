@@ -25,6 +25,12 @@ export interface ServiceIdentity {
   id: string;
   org_id: string;
   name: string;
+  /** ISO-8601, or null for an identity that never expires. Nullable so
+   * identities created before expiry existed keep working. */
+  expires_at?: string | null;
+  /** ISO-8601 of the last successful authentication, or null if never
+   * used. This is what surfaces the identity everyone forgot about. */
+  last_used_at?: string | null;
 }
 
 export type VaultProviderKind = "aws" | "bitwarden";
@@ -102,22 +108,46 @@ export class ControlPlaneRepo {
 
   /** Returns the created row plus the plaintext bootstrap token - the only
    * time it is ever available. Only its hash is persisted. */
-  async createServiceIdentity(orgId: string, name: string, tokenHash: string): Promise<ServiceIdentity> {
+  async createServiceIdentity(
+    orgId: string,
+    name: string,
+    tokenHash: string,
+    expiresAt?: string | null,
+  ): Promise<ServiceIdentity> {
     const id = randomUUID();
-    await this.db.run("INSERT INTO service_identities (id, org_id, name, bootstrap_token_hash) VALUES (?, ?, ?, ?)", [id, orgId, name, tokenHash]);
-    return { id, org_id: orgId, name };
+    await this.db.run(
+      "INSERT INTO service_identities (id, org_id, name, bootstrap_token_hash, expires_at) VALUES (?, ?, ?, ?, ?)",
+      [id, orgId, name, tokenHash, expiresAt ?? null],
+    );
+    return { id, org_id: orgId, name, expires_at: expiresAt ?? null, last_used_at: null };
   }
 
   async findServiceIdentityByTokenHash(tokenHash: string): Promise<ServiceIdentity | undefined> {
-    return await this.db.get("SELECT id, org_id, name FROM service_identities WHERE bootstrap_token_hash = ?", [tokenHash]) as ServiceIdentity | undefined;
+    return await this.db.get(
+      "SELECT id, org_id, name, expires_at, last_used_at FROM service_identities WHERE bootstrap_token_hash = ?",
+      [tokenHash],
+    ) as ServiceIdentity | undefined;
   }
 
   async findServiceIdentityById(id: string): Promise<ServiceIdentity | undefined> {
-    return await this.db.get("SELECT id, org_id, name FROM service_identities WHERE id = ?", [id]) as ServiceIdentity | undefined;
+    return await this.db.get(
+      "SELECT id, org_id, name, expires_at, last_used_at FROM service_identities WHERE id = ?",
+      [id],
+    ) as ServiceIdentity | undefined;
   }
 
   async listServiceIdentities(orgId: string): Promise<ServiceIdentity[]> {
-    return await this.db.all("SELECT id, org_id, name FROM service_identities WHERE org_id = ? ORDER BY name", [orgId]) as ServiceIdentity[];
+    return await this.db.all(
+      "SELECT id, org_id, name, expires_at, last_used_at FROM service_identities WHERE org_id = ? ORDER BY name",
+      [orgId],
+    ) as ServiceIdentity[];
+  }
+
+  /** Records a successful authentication. Best-effort and deliberately
+   * not awaited on the auth path - a write failure here must never turn
+   * a valid credential into a rejected one. */
+  async touchServiceIdentityLastUsed(id: string, at: string = new Date().toISOString()): Promise<void> {
+    await this.db.run("UPDATE service_identities SET last_used_at = ? WHERE id = ?", [at, id]);
   }
 
   async createOidcBinding(serviceIdentityId: string, issuer: string, subjectPattern: string): Promise<OidcBinding> {

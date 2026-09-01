@@ -39,6 +39,12 @@ export interface ServiceIdentity {
   id: string;
   org_id: string;
   name: string;
+  /** ISO-8601, or null for an identity that never expires. */
+  expires_at?: string | null;
+  /** ISO-8601 of the last successful authentication, or null if never
+   * used. The identity nobody has touched in months is the one worth
+   * looking at, so this is surfaced in the list rather than hidden. */
+  last_used_at?: string | null;
 }
 
 /** Only ever returned once, at creation. */

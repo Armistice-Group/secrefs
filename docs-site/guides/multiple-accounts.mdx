@@ -54,3 +54,21 @@ so you know which `aws sso login` to run.
   The CLI currently uses the four default aliases above. Custom aliases are a
   library-level feature today — a project config file for the CLI is planned.
 </Note>
+
+## Service identity lifetime
+
+When an application authenticates to a SecRefs control plane rather than
+using ambient credentials, it does so as a **service identity**. Those can be
+given a lifetime:
+
+```bash
+POST /v1/service-identities
+{ "orgId": "...", "name": "ci-deploy", "expiresInDays": 90 }
+```
+
+Omit `expiresInDays` and the identity never expires — which is the default, and
+is what every identity created before this existed still has.
+
+The console shows each identity's expiry alongside **when it was last used**.
+The second is usually the more useful of the two: a token rotated on schedule
+was never the risk. The one nobody has touched in eight months is.

@@ -39,6 +39,28 @@ export function hashToken(token: string): string {
  *      registered for its `iss` using the same glob-lite pattern
  *      matching `Grant.path_pattern` already uses.
  */
+/** An identity with no `expires_at` never expires - that's the default,
+ * and it's what every identity created before expiry existed has. */
+function isExpired(identity: ServiceIdentity, now: number = Date.now()): boolean {
+  if (!identity.expires_at) return false;
+  const at = Date.parse(identity.expires_at);
+  // An unparseable timestamp must not silently mean "never expires":
+  // fail closed, because the admin clearly intended *some* expiry.
+  return Number.isNaN(at) ? true : at <= now;
+}
+
+/** Best-effort last-use tracking. Swallows its own failure on purpose -
+ * a write problem here must never turn a valid credential into a
+ * rejected one, and this column is for finding forgotten identities, not
+ * for authorization. */
+async function recordUse(repo: ControlPlaneRepo, identity: ServiceIdentity): Promise<void> {
+  try {
+    await repo.touchServiceIdentityLastUsed(identity.id);
+  } catch {
+    // intentionally ignored - see above
+  }
+}
+
 export async function resolvePrincipal(
   repo: ControlPlaneRepo,
   authorizationHeader: string | undefined,
@@ -49,7 +71,11 @@ export async function resolvePrincipal(
   if (!token) return undefined;
 
   const byBootstrapToken = await repo.findServiceIdentityByTokenHash(hashToken(token));
-  if (byBootstrapToken) return byBootstrapToken;
+  if (byBootstrapToken) {
+    if (isExpired(byBootstrapToken)) return undefined;
+    await recordUse(repo, byBootstrapToken);
+    return byBootstrapToken;
+  }
 
   if (!oidcConfig || token.split(".").length !== 3) return undefined;
 
@@ -67,5 +93,11 @@ export async function resolvePrincipal(
   const binding = (await repo.findOidcBindingsByIssuer(iss)).find((b) => matchesPathPattern(b.subject_pattern, sub));
   if (!binding) return undefined;
 
-  return await repo.findServiceIdentityById(binding.service_identity_id);
+  const identity = await repo.findServiceIdentityById(binding.service_identity_id);
+  // An expired identity is expired however it authenticated. OIDC tokens
+  // are short-lived on their own, but the identity's own lifetime is a
+  // separate decision an admin made and it has to hold for both paths.
+  if (!identity || isExpired(identity)) return undefined;
+  await recordUse(repo, identity);
+  return identity;
 }

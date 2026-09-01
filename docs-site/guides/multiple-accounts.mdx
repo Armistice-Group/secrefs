@@ -1,0 +1,56 @@
+---
+title: "Multiple accounts and vaults"
+description: "Two AWS accounts, three Bitwarden projects, one config."
+---
+
+The provider segment of a reference is an **alias**, not a fixed provider type.
+`sec://aws/...` works out of the box because `aws` is a default alias — but you
+can register whatever names you like.
+
+```ts
+import { SecRefs, AwsSecretsManagerProvider } from "@secrefs/node";
+
+const secRefs = new SecRefs({
+  providers: {
+    "aws-prod":    new AwsSecretsManagerProvider({ region: "us-east-1" }),
+    "aws-staging": new AwsSecretsManagerProvider({ region: "us-west-2" }),
+  },
+});
+```
+
+```bash .env
+DB_PASSWORD=sec://aws-prod/db#password
+TEST_DB=sec://aws-staging/db#password
+```
+
+The same applies to Bitwarden — one provider instance per machine account or
+organization, each under its own alias.
+
+## Default aliases
+
+| Alias | Provider |
+|---|---|
+| `aws` | AWS Secrets Manager |
+| `vault` | HashiCorp Vault |
+| `bitwarden` | Bitwarden Secrets Manager |
+| `local` | Gitignored local JSON, for development |
+
+Passing your own `providers` map replaces these entirely — include any defaults
+you still want.
+
+## A note on AWS profiles
+
+Multiple aliases pointing at different AWS accounts each depend on their **own**
+credentials being valid. With SSO that means a live session per profile, and
+they expire independently. When one lapses, SecRefs names which alias failed:
+
+```
+Cannot authenticate to provider "aws-staging".
+```
+
+so you know which `aws sso login` to run.
+
+<Note>
+  The CLI currently uses the four default aliases above. Custom aliases are a
+  library-level feature today — a project config file for the CLI is planned.
+</Note>

@@ -1,0 +1,82 @@
+---
+title: "Troubleshooting"
+description: "What a failure is telling you, and what to do about it."
+---
+
+SecRefs separates failures into two categories, because they have different
+causes and different fixes.
+
+## "Cannot authenticate to provider"
+
+```
+secrefs: could not authenticate to a secret provider.
+Cannot authenticate to provider "aws".
+  [aws] cannot authenticate: Could not load credentials from any providers
+  Check credentials for AWS profile "acme-prod" - if it uses SSO,
+  run: aws sso login --profile acme-prod
+  Not resolved: DB_PASSWORD, STRIPE_KEY, GITHUB_TOKEN
+```
+
+**Your references are fine.** Your credentials are missing or expired. This is
+reported once for the whole provider, with the list of references that were
+blocked — not once per reference, which would read as three broken secrets.
+
+Common causes:
+
+<AccordionGroup>
+<Accordion title="Your AWS SSO session expired (most common, locally)">
+SSO sessions last 8–12 hours. Run:
+
+```bash
+aws sso login --profile <your-profile>
+```
+
+A long-running process **recovers on its own** once you do — SecRefs does not
+cache failures, so the next resolution succeeds without a restart.
+</Accordion>
+
+<Accordion title="No credentials at all">
+`Could not load credentials from any providers` means the whole AWS credential
+chain came up empty. Set `AWS_PROFILE`, export static keys, or attach an
+instance role.
+</Accordion>
+
+<Accordion title="Bitwarden or Vault token missing">
+Set `BWS_ACCESS_TOKEN` for Bitwarden, or `VAULT_ADDR` and `VAULT_TOKEN` for
+Vault. Both are read from the environment; SecRefs never stores them.
+</Accordion>
+</AccordionGroup>
+
+## "Failed to resolve N secret reference(s)"
+
+```
+Failed to resolve 1 secret reference(s):
+  - DB_PASSWORD: sec://aws/prod/db#password -> [aws] failed to fetch secret at "prod/db": ...
+```
+
+Here the reference really is the problem. Each one is listed individually
+because each may be wrong in a different way.
+
+| Message contains | Meaning | Fix |
+|---|---|---|
+| `ResourceNotFoundException` | The path doesn't exist in that vault | Check the path and the region |
+| `AccessDenied` | Credentials work; the policy refuses **this** secret | Fix the IAM/role policy — **not** a login problem |
+| `is not JSON, cannot extract field` | You used `#field` on a plain-string secret | Drop the `#field`, or store JSON |
+| `field "x" not found` | The JSON has no such key | Check the field name |
+
+<Note>
+  `AccessDenied` is deliberately **not** treated as an authentication failure.
+  Your credentials worked — a policy said no to one secret. Sending you to
+  re-login would waste your time.
+</Note>
+
+## Diagnosing without resolving
+
+`check` validates every reference and never returns a plaintext value:
+
+```bash
+npx secrefs check
+```
+
+It reports provider health separately from reference validity, so you can tell
+"my credentials are broken" from "these two references are wrong".

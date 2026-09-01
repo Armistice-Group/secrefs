@@ -1,3 +1,5 @@
+import { classifyError, remedyFor, type SecretErrorKind } from "./errors.js";
+
 /**
  * The provider contract every SecRefs backend (AWS, Vault, local, or a
  * custom one you bring yourself) implements. Providers never log, print,
@@ -43,13 +45,30 @@ export interface ISecretProvider {
 }
 
 export class SecretFetchError extends Error {
+  /** Whose problem this is - see {@link SecretErrorKind}. Classified from
+   * `cause` so every existing throw site is categorised without having to
+   * know about categories. */
+  readonly kind: SecretErrorKind;
+  /** The action that fixes it, when there is one (auth failures). */
+  readonly remedy?: string;
+
   constructor(
     public readonly provider: string,
     public readonly path: string,
-    cause: unknown,
+    public readonly cause: unknown,
   ) {
-    super(`[${provider}] failed to fetch secret at "${path}": ${errorMessage(cause)}`);
+    const kind = classifyError(cause);
+    // An auth failure has nothing to do with the path, and naming one
+    // implies the reference is at fault. Four references failing on one
+    // dead credential should not read as four broken secrets.
+    super(
+      kind === "auth"
+        ? `[${provider}] cannot authenticate: ${errorMessage(cause)}`
+        : `[${provider}] failed to fetch secret at "${path}": ${errorMessage(cause)}`,
+    );
     this.name = "SecretFetchError";
+    this.kind = kind;
+    this.remedy = remedyFor(kind, provider, cause);
   }
 }
 

@@ -1,5 +1,11 @@
 import { type ParsedSecretRef, isSecretRef, parseSecretRef } from "./parser.js";
-import { errorMessage, type ISecretProvider, type SecretFetchRequest } from "./providers/base.js";
+import {
+  errorMessage,
+  SecretFetchError,
+  type ISecretProvider,
+  type SecretFetchRequest,
+} from "./providers/base.js";
+import type { SecretErrorKind } from "./providers/errors.js";
 
 export type ProviderRegistry = Record<string, ISecretProvider>;
 
@@ -21,15 +27,59 @@ export interface ResolutionFailure {
   /** The original `sec://` string. */
   ref: string;
   message: string;
+  /** Whose problem this is. `undefined` when the failure came from
+   * somewhere that doesn't classify (a malformed reference, say). */
+  kind?: SecretErrorKind;
+  /** Provider alias the reference named, for grouping auth failures. */
+  provider?: string;
+  /** What to run to fix it, for auth failures. */
+  remedy?: string;
+}
+
+/**
+ * Renders failures the way they should be read.
+ *
+ * One expired credential produces one failure per reference, and listing
+ * them individually - `DB_PASSWORD: could not fetch...`, four times -
+ * reads as four broken secrets and sends people to check their secrets.
+ * Auth failures are therefore collapsed per provider, stated as an
+ * environment problem, and given the command that fixes them. Path
+ * failures stay itemised, because there the reference really is the
+ * thing at fault.
+ */
+function formatFailures(errors: ResolutionFailure[]): string {
+  const auth = errors.filter((e) => e.kind === "auth");
+  const rest = errors.filter((e) => e.kind !== "auth");
+  const lines: string[] = [];
+
+  for (const provider of [...new Set(auth.map((e) => e.provider ?? "unknown"))]) {
+    const group = auth.filter((e) => (e.provider ?? "unknown") === provider);
+    lines.push(`Cannot authenticate to provider "${provider}".`);
+    lines.push(`  ${group[0]!.message}`);
+    const remedy = group.find((e) => e.remedy)?.remedy;
+    if (remedy) lines.push(`  ${remedy}`);
+    lines.push(`  Not resolved: ${group.map((e) => e.key).join(", ")}`);
+  }
+
+  if (rest.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(`Failed to resolve ${rest.length} secret reference(s):`);
+    for (const e of rest) lines.push(`  - ${e.key}: ${e.ref} -> ${e.message}`);
+  }
+
+  return lines.join("\n");
 }
 
 export class SecRefsResolutionError extends Error {
   constructor(public readonly errors: ResolutionFailure[]) {
-    super(
-      `Failed to resolve ${errors.length} secret reference(s):\n` +
-        errors.map((e) => `  - ${e.key}: ${e.ref} -> ${e.message}`).join("\n"),
-    );
+    super(formatFailures(errors));
     this.name = "SecRefsResolutionError";
+  }
+
+  /** True when every failure was an environment/auth problem, so a caller
+   * can tell "your credentials lapsed" from "your references are wrong". */
+  get isAuthOnly(): boolean {
+    return this.errors.length > 0 && this.errors.every((e) => e.kind === "auth");
   }
 }
 
@@ -101,7 +151,15 @@ export async function expandKeyValueMap(
     if (result.status === "fulfilled") {
       output[key] = result.value;
     } else {
-      errors.push({ key, ref: ref.raw, message: errorMessage(result.reason) });
+      const reason = result.reason;
+      errors.push({
+        key,
+        ref: ref.raw,
+        message: errorMessage(reason),
+        kind: reason instanceof SecretFetchError ? reason.kind : undefined,
+        provider: reason instanceof SecretFetchError ? reason.provider : ref.provider,
+        remedy: reason instanceof SecretFetchError ? reason.remedy : undefined,
+      });
     }
   });
 

@@ -1,0 +1,63 @@
+---
+title: "Reference syntax"
+description: "What sec://aws/prod/db#password means, piece by piece."
+---
+
+```
+sec://<provider>/<path>[#field]
+```
+
+| Part | Meaning |
+|---|---|
+| `provider` | Which vault to ask. An **alias**, not a fixed type — see [multiple accounts](/guides/multiple-accounts) |
+| `path` | The secret's identifier within that vault |
+| `field` | Optional. Extracts one key from a JSON secret |
+
+## The field selector
+
+Most vaults store structured secrets. Given `prod/db` holding:
+
+```json
+{ "user": "app_prod", "password": "S3cur3-P@ss" }
+```
+
+`sec://aws/prod/db#password` returns **only** `S3cur3-P@ss`. Omit the `#field`
+and you get the whole JSON string.
+
+Nested fields use dot notation: `sec://aws/prod/db#creds.primary.password`.
+
+## Where references can go
+
+Anywhere a string lives:
+
+```bash .env
+DB_PASSWORD=sec://aws/prod/db#password
+```
+
+```ts
+const key = await secRefs.expandString("sec://vault/kv/stripe#key");
+```
+
+```ts
+// A plain value passes through untouched, so you can migrate gradually.
+await secRefs.expandString("not-a-reference"); // -> "not-a-reference"
+```
+
+That last property matters more than it looks: you can accept both forms at the
+same call site and move consumers over one at a time, rather than needing a
+flag day.
+
+## Strict mode
+
+By default, a reference that cannot be resolved **throws**. It does not silently
+become `undefined` and let your app boot half-configured, which is how a missing
+secret turns into a confusing failure three layers away.
+
+```ts
+const secRefs = new SecRefs({ strict: false }); // leave unresolvable refs in place
+```
+
+<Note>
+  Strict mode only affects *malformed* references. An unknown provider or a
+  failed fetch always surfaces as an error regardless.
+</Note>

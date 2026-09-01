@@ -76,9 +76,29 @@ function handler(event) {
   var request = event.request;
   var uri = request.uri;
 
+  // "/" is the only path that maps to a directory index, because
+  // next export with trailingSlash:false writes flat files everywhere
+  // else. Root is served by defaultRootObject, so nothing to do.
+  if (uri === "/") {
+    return request;
+  }
+
+  // A trailing slash on any other path would resolve to a directory
+  // index that does not exist. Redirect to the canonical slash-less
+  // form rather than rewriting, so the URL a visitor keeps (and a
+  // crawler indexes) is the one we actually serve.
   if (uri.endsWith("/")) {
-    request.uri = uri + "index.html";
-  } else if (!uri.split("/").pop().includes(".")) {
+    return {
+      statusCode: 301,
+      statusDescription: "Moved Permanently",
+      headers: { location: { value: uri.slice(0, -1) } },
+    };
+  }
+
+  // Extension-less paths are pages: /for-vendors -> for-vendors.html.
+  // Anything with a dot in its last segment is an asset and is left
+  // alone, so /_next/static/*.js is never rewritten.
+  if (!uri.split("/").pop().includes(".")) {
     request.uri = uri + ".html";
   }
 

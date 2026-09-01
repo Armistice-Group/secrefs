@@ -100,3 +100,123 @@ describe("TtlCache", () => {
     expect(load).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("TtlCache stale grace", () => {
+  const transient = () => true;
+
+  it("serves the last good value when a transient failure lands inside the window", async () => {
+    const load = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("good")
+      .mockRejectedValueOnce(new Error("blip"));
+    let now = 1_000;
+    const cache = new TtlCache<string>({
+      staleGraceMs: 5_000,
+      isStaleServable: transient,
+      now: () => now,
+    });
+
+    expect(await cache.fetch("k", load)).toBe("good");
+    now = 3_000;
+    expect(await cache.fetch("k", load)).toBe("good");
+  });
+
+  it("refuses once the value is older than the window", async () => {
+    const load = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("good")
+      .mockRejectedValueOnce(new Error("blip"));
+    let now = 1_000;
+    const cache = new TtlCache<string>({
+      staleGraceMs: 5_000,
+      isStaleServable: transient,
+      now: () => now,
+    });
+
+    await cache.fetch("k", load);
+    now = 20_000;
+    await expect(cache.fetch("k", load)).rejects.toThrow("blip");
+  });
+
+  it("never serves stale for a failure the predicate rejects", async () => {
+    // The whole safety property: an expired credential must surface, not
+    // be papered over with the value fetched before it expired.
+    const load = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("good")
+      .mockRejectedValueOnce(new Error("expired"));
+    const cache = new TtlCache<string>({
+      staleGraceMs: 60_000,
+      isStaleServable: () => false,
+    });
+
+    await cache.fetch("k", load);
+    await expect(cache.fetch("k", load)).rejects.toThrow("expired");
+  });
+
+  it("measures the window from the last success, so a sustained outage cannot be ridden forever", async () => {
+    const load = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("good")
+      .mockRejectedValue(new Error("still down"));
+    let now = 1_000;
+    const cache = new TtlCache<string>({
+      staleGraceMs: 5_000,
+      isStaleServable: transient,
+      now: () => now,
+    });
+
+    await cache.fetch("k", load);
+    now = 3_000;
+    expect(await cache.fetch("k", load)).toBe("good"); // inside the window
+    now = 4_500;
+    expect(await cache.fetch("k", load)).toBe("good"); // still inside
+    now = 7_000;
+    // Serving a stale value must not have reset the clock.
+    await expect(cache.fetch("k", load)).rejects.toThrow("still down");
+  });
+
+  it("reports the staleness without ever handing over the value", async () => {
+    const seen: Array<{ key: string; ageMs: number }> = [];
+    const load = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("good")
+      .mockRejectedValueOnce(new Error("blip"));
+    let now = 1_000;
+    const cache = new TtlCache<string>({
+      staleGraceMs: 5_000,
+      isStaleServable: transient,
+      onStale: (key, ageMs) => seen.push({ key, ageMs }),
+      now: () => now,
+    });
+
+    await cache.fetch("k", load);
+    now = 2_500;
+    await cache.fetch("k", load);
+
+    expect(seen).toEqual([{ key: "k", ageMs: 1_500 }]);
+  });
+
+  it("stays off by default - a failure is a failure", async () => {
+    const load = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce("good")
+      .mockRejectedValueOnce(new Error("blip"));
+    const cache = new TtlCache<string>();
+
+    await cache.fetch("k", load);
+    await expect(cache.fetch("k", load)).rejects.toThrow("blip");
+  });
+
+  it("does not serve stale values as fresh when only a grace window is set", async () => {
+    // staleGraceMs retains a value, but retention must not become caching:
+    // with ttlMs still 0, a *successful* path re-fetches every time.
+    const load = vi.fn(async () => "v");
+    const cache = new TtlCache<string>({ staleGraceMs: 60_000, isStaleServable: transient });
+
+    await cache.fetch("k", load);
+    await cache.fetch("k", load);
+
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+});

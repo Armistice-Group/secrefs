@@ -1,0 +1,36 @@
+---
+title: "HashiCorp Vault"
+description: "sec://vault/... — KV v1 and v2, using the token already in your environment."
+---
+
+```bash
+STRIPE_KEY=sec://vault/kv/stripe#key
+```
+
+## Authentication
+
+```bash
+export VAULT_ADDR="https://vault.internal:8200"
+export VAULT_TOKEN="hvs...."
+```
+
+Both are the standard Vault environment variables, so anything that already
+works with the `vault` CLI works here without extra configuration.
+
+## Paths
+
+The path after the provider segment is the Vault path, including the mount:
+
+```bash
+sec://vault/secret/data/stripe#key   # KV v2 (note the /data/ segment)
+sec://vault/secret/stripe#key        # KV v1
+```
+
+KV v2 stores values under a `data` key internally; SecRefs unwraps that for you,
+so `#key` refers to your field rather than Vault's envelope.
+
+<Warning>
+  A Vault token has its own TTL and may need renewing. An expired token is
+  reported as an authentication failure, not as a missing secret — see
+  [Troubleshooting](/guides/troubleshooting).
+</Warning>

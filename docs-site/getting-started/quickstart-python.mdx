@@ -1,0 +1,55 @@
+---
+title: "Quickstart (Python)"
+description: "The same reference workflow, for Python applications."
+---
+
+## Install
+
+```bash
+pip install secrefs
+```
+
+Bitwarden support is an optional extra, because `bitwarden-sdk` ships only
+prebuilt wheels for a fixed set of platforms and a hard dependency would break
+installing SecRefs at all on the others:
+
+```bash
+pip install "secrefs[bitwarden]"
+```
+
+## Use it
+
+<Steps>
+<Step title="Write a reference">
+```bash .env
+DB_PASSWORD=sec://aws/prod/db#password
+```
+</Step>
+
+<Step title="Run through the CLI">
+```bash
+secrefs-py run -- python app.py
+```
+Your app reads `os.environ["DB_PASSWORD"]` unchanged.
+</Step>
+
+<Step title="Or call it directly">
+```python
+from secrefs import sec_refs
+
+# Expand everything in os.environ, once, at boot.
+await sec_refs.init()
+
+# Or resolve at the point of use - this one picks up rotations.
+key = await sec_refs.expand_string("sec://aws/prod/stripe#key")
+```
+</Step>
+</Steps>
+
+## Parity with Node
+
+The Python package implements the same reference syntax, the same providers,
+and the same two-entry-point model. Everything in
+[Load time vs use time](/guides/load-time-vs-use-time) and
+[Reference syntax](/getting-started/references) applies unchanged — only the
+method names differ (`expand_string` rather than `expandString`).

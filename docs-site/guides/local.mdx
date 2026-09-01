@@ -1,0 +1,32 @@
+---
+title: "Local (development only)"
+description: "sec://local/... — a gitignored JSON file for people without vault access yet."
+---
+
+```bash
+DB_PASSWORD=sec://local/demo-db#password
+```
+
+Reads from `.secrefs.local.json` in the working directory:
+
+```json .secrefs.local.json
+{
+  "demo-db": { "password": "hunter2", "user": "postgres" },
+  "api-key": "plain-string-secrets-work-too"
+}
+```
+
+<Warning>
+  **Add this file to `.gitignore`.** It contains real values — it is the one
+  file in this workflow that does. Everything else SecRefs touches is safe to
+  commit, which is the point, and it is easy to forget that this file is the
+  exception.
+</Warning>
+
+## What it's for
+
+Onboarding, mostly. A new teammate can run the app on day one before their vault
+access is provisioned, without anyone pasting a production secret into Slack.
+The `.env` stays identical to everyone else's except for the provider segment.
+
+It is not for production, and there is no mode in which it should be.

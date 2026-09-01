@@ -1,0 +1,50 @@
+---
+title: "CLI"
+description: "secrefs run, secrefs check."
+---
+
+## `secrefs run`
+
+Resolves every `sec://` reference in the environment and spawns a child process
+with the hydrated values.
+
+```bash
+secrefs run -- node server.js
+secrefs run -- python manage.py migrate
+```
+
+```
+secrefs: resolved 2 secret reference(s): DB_PASSWORD, STRIPE_KEY
+```
+
+The child inherits stdio, and its exit code and terminating signal are
+propagated — so `secrefs run --` in front of an existing command changes
+nothing about how that command behaves in a shell, a Makefile, or CI.
+
+Values are resolved **in memory**. Nothing is written to disk at any point.
+
+## `secrefs check`
+
+Validates every reference without returning any value. Safe for CI.
+
+```bash
+secrefs check
+```
+
+Reports provider health separately from reference validity, so a broken
+credential doesn't look like a page of broken references.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Everything resolved (or the child exited 0) |
+| `1` | Resolution failed, or the child could not be started |
+| *child's* | Whatever the child process exited with |
+
+## Environment
+
+The CLI reads `.env` from the working directory, following `dotenv`'s
+precedence: **an existing environment variable is never overridden** by the
+file. Provider credentials come from the environment as usual —
+`AWS_PROFILE`, `BWS_ACCESS_TOKEN`, `VAULT_TOKEN`, and so on.

@@ -236,14 +236,20 @@ and excluded unless noted.
 | KMS customer-managed key | $1 |
 | Secrets Manager, 2 secrets | ~$1 |
 | ECR storage, CloudWatch Logs, ACM | ~$1 |
-| **Subtotal — no egress infrastructure** | **~$56** |
-| NAT gateway (`enable_nat_gateway`), + $0.045/GB processed | ~$33 |
-| 9 interface VPC endpoints (`enable_vpc_endpoints`), + $0.01/GB | ~$66 |
-| **Total, as configured by default** | **~$155** |
+| **Total, as configured by default** | **~$56** |
+| NAT gateway (`enable_nat_gateway = true`), + $0.045/GB processed | +$33 |
+| 7 interface VPC endpoints (`enable_vpc_endpoints = true`), + $0.01/GB | +$66 |
+| **Hardened: `public_instance = false` + both of the above** | **~$155** |
+
+The default matches the rest of this portfolio (armory-swap, pwnbook):
+instance in a public subnet reached outbound via the internet gateway, no
+NAT, no interface endpoints. Those two flags are most of what a hardened
+deployment costs, and they are worth turning on once there is revenue to
+justify them — see the tradeoff below.
 
 ### Networking cost/benefit
 
-Read this before turning either flag off — they are not interchangeable.
+Read this before turning either flag **on** — they are not interchangeable, and neither is on by default any more.
 
 **`enable_vpc_endpoints`** (~$66/mo, ~$7.30 per endpoint) buys two
 different things:
@@ -263,8 +269,9 @@ is separate, free, and always created — it carries ECR layer pulls and
 AL2023's package repositories, both of which would otherwise be metered
 NAT traffic.
 
-**`enable_nat_gateway`** (~$33/mo) is required in practice despite the
-above, because the app itself calls three third-party HTTPS services that
+**`enable_nat_gateway`** (~$33/mo) is only needed when `public_instance =
+false`. A public-subnet instance reaches the internet through the internet
+gateway at no hourly cost. When the instance *is* private, NAT is required because the app itself calls three third-party HTTPS services that
 have no AWS endpoint:
 
 - **WorkOS** (`src/auth/workos.ts`) — admin authentication. Without it,

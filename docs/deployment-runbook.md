@@ -168,13 +168,17 @@ cors_origins = ["https://app.secrefs.com"]
 - **The `REPLACE_ME` window.** Between 2a and 2c the API is live and
   unauthenticated. Keep it short, and don't publish the domain until
   `/v1/config` reports `adminAuthRequired: true`.
-- **NAT is required at boot**, not just at runtime: the instance fetches
-  Amazon's RDS CA bundle to verify the database's TLS certificate.
-  `enable_nat_gateway = false` will leave an instance that cannot reach
-  its own database.
-- **Costs ~$155/mo as defaulted** (see `apps/control-plane/infra/README.md`
-  for the line items). `enable_vpc_endpoints = false` drops it to ~$89 and
-  is a reasonable launch posture — the tradeoff is that Secrets Manager,
-  KMS and STS traffic then goes over NAT rather than staying inside AWS.
+- **The instance needs egress at boot**, not just at runtime: it fetches
+  its image from ECR, its secrets from Secrets Manager, and Amazon's RDS
+  CA bundle to verify the database's TLS certificate. On the default
+  (public subnet) that comes from the internet gateway. If you set
+  `public_instance = false`, you must enable NAT or the interface
+  endpoints — Terraform refuses to plan the combination that can't boot.
+- **Costs ~$56/mo as defaulted** (see `apps/control-plane/infra/README.md`
+  for the line items) — the same shape as armory-swap and pwnbook: public
+  subnet, no NAT, no interface endpoints. `public_instance = false` plus
+  `enable_nat_gateway`/`enable_vpc_endpoints` buys the hardened posture
+  for roughly $99/mo more, and is worth turning on once there is revenue
+  to justify it.
 - **`deletion_protection = false` by default.** Turn it on before the
   database holds anything you'd mind losing.

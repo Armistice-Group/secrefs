@@ -106,6 +106,32 @@ variable "ec2_root_volume_gb" {
 
 # ── Networking ────────────────────────────────────────────────────────────────
 
+variable "public_instance" {
+  description = <<-EOT
+    Place the app instance in a public subnet with a public IP rather
+    than a private subnet behind NAT. Default true: it is what the rest
+    of this portfolio does and it removes roughly $99/month of egress
+    infrastructure (a NAT gateway plus seven interface endpoints), which
+    is most of this stack's bill.
+
+    The instance is routable in this mode, but its security group admits
+    only the app port from the ALB, so it is not reachable as a service.
+    Set false - with enable_nat_gateway or enable_vpc_endpoints on - for
+    the stronger posture where the box is structurally unreachable.
+  EOT
+  type        = bool
+  default     = true
+
+  validation {
+    # A private instance needs *some* egress or it cannot pull its image,
+    # read its secrets, or fetch the RDS CA bundle - it boots broken and
+    # is unrecoverable except by replacement, with no SSM to debug it.
+    # Catch that at plan time rather than after a 10-minute apply.
+    condition     = var.public_instance || var.enable_nat_gateway || var.enable_vpc_endpoints
+    error_message = "public_instance = false requires enable_nat_gateway or enable_vpc_endpoints; a private instance with neither has no route to ECR, Secrets Manager, or SSM and cannot boot."
+  }
+}
+
 variable "enable_vpc_endpoints" {
   description = <<-EOT
     Create interface VPC endpoints for the AWS services this instance talks
@@ -121,7 +147,7 @@ variable "enable_vpc_endpoints" {
     through the NAT gateway instead.
   EOT
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "enable_nat_gateway" {
@@ -148,7 +174,7 @@ variable "enable_nat_gateway" {
     endpoint is UNAUTHENTICATED (see the boot warning in src/server.ts).
   EOT
   type        = bool
-  default     = true
+  default     = false
 }
 
 # ── Feature flags ─────────────────────────────────────────────────────────────

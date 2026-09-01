@@ -199,10 +199,16 @@ export default function Sandbox() {
           spellCheck={false}
           className="min-h-[280px] flex-1 resize-none bg-transparent p-4 font-mono text-[13px] leading-relaxed text-slate-200 outline-none sm:text-sm"
         />
-        <div className="flex items-center justify-between border-t border-white/10 px-4 py-3">
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <ShieldCheck className="h-3.5 w-3.5 text-signal-500/70" />
-            Resolved entirely in your browser&apos;s memory. Nothing is sent over the network.
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3">
+          {/* min-w-0 lets this column shrink below its text width so the
+              caption wraps inside its own box. Without it the flex item
+              refuses to shrink, overflows, and the shrink-0 button ends up
+              painted on top of the text. */}
+          <div className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-signal-500/70" />
+            <span>
+              Resolved entirely in your browser&apos;s memory. Nothing is sent over the network.
+            </span>
           </div>
           <button
             onClick={handleExpand}

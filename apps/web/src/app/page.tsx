@@ -139,7 +139,7 @@ export default function HomePage() {
               <ShieldCheck className="h-3.5 w-3.5" />
               Bring Your Own Vault
             </div>
-            <h1 className="glow-text text-4xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl">
+            <h1 className="glow-text text-balance text-4xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl">
               Your secrets stay in your vault.
               <br />
               <span className="text-signal-400">Only references</span> ever leave it.
@@ -186,9 +186,10 @@ export default function HomePage() {
             You already have a vault. Stop copying secrets out of it.
           </h2>
           <p className="mt-4 text-slate-400">
-            Every plaintext secret that leaves your vault - into a `.env` file, a CI variable, a
-            teammate&apos;s clipboard - is a copy you now have to track, rotate, and eventually
-            leak. SecRefs replaces the copy with a pointer.
+            Every plaintext secret that leaves your vault - into a{" "}
+            <code className="text-signal-400">.env</code> file, a CI variable, a teammate&apos;s
+            clipboard - is a copy you now have to track, rotate, and eventually leak. SecRefs
+            replaces the copy with a pointer.
           </p>
         </div>
 

@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml calls this before publishing, so a release runs the exact
+  # same gate as main rather than a second, drifting copy of it.
+  workflow_call:
 
 # Read-only by default - this workflow only runs tests, it never needs to
 # write to the repo, publish a package, or touch a deployment.

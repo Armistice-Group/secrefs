@@ -1,0 +1,76 @@
+---
+title: "Load time vs use time"
+description: "The one decision that determines whether a rotated secret reaches your process."
+---
+
+SecRefs offers two entry points. They look interchangeable and are not.
+
+## `init()` — resolve once, at boot
+
+```ts
+await secRefs.init(); // process.env is now fully hydrated
+```
+
+Every `sec://` value in `process.env` is replaced with its real value, once.
+After that your process holds plain strings in memory.
+
+**A rotation reaches this process on its next restart, and not before.**
+
+Right for: short-lived processes, CLI tools, anything that already reads config
+once at startup.
+
+## `expandString()` — resolve at the moment of use
+
+```ts
+const key = await secRefs.expandString("sec://aws/prod/stripe#key");
+```
+
+Every call re-fetches (`cacheTtlMs` defaults to `0`). A long-running process
+picks up a rotation **without a restart**:
+
+```ts
+await secRefs.expandString(REF); // "live-verify-8c41f9d2"
+// ... the secret is rotated in AWS, out of band ...
+await secRefs.expandString(REF); // "ROTATED-3b7e01aa"  — same process
+```
+
+Right for: long-running services, and anything where "rotate without a
+redeploy" is the reason you're here.
+
+## The tradeoff, stated plainly
+
+Use-time resolution couples **every use** to your vault being reachable and your
+credentials being valid right now. Load-time resolution reads once and then
+survives anything — vault down, network gone, credentials expired.
+
+That is a real availability cost, and it is the honest price of the rotation
+guarantee.
+
+<Note>
+  Concurrent resolutions of the same reference are coalesced into a single
+  fetch, so use-time resolution costs one round trip per distinct reference in
+  flight — not one per call site.
+</Note>
+
+## Tuning it
+
+```ts
+new AwsSecretsManagerProvider({
+  cacheTtlMs: 30_000,   // a rotation reaches me within 30s
+  staleGraceMs: 5_000,  // ride out a brief blip with the last good value
+})
+```
+
+`cacheTtlMs` trades a bounded window of staleness for fewer round trips.
+
+`staleGraceMs` is narrower and worth understanding before you enable it: after a
+**failed** refresh, a value fetched within the window may be served instead of
+throwing. It applies **only to transient faults** — network, timeout, throttle,
+5xx.
+
+<Warning>
+  An expired credential or a permission denial is **never** answered from a
+  stale value. Both mean something in your environment changed that a human has
+  to see, and a stale value fetched before a rotation may be a key that was
+  rotated *because it leaked*. Keep the window short.
+</Warning>

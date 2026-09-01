@@ -6,11 +6,13 @@ import {
 import {
   BaseSecretProvider,
   errorMessage,
+  SecretFetchError,
   extractField,
   type ProviderHealth,
   type SecretFetchRequest,
 } from "./base.js";
 import { TtlCache } from "../ttlCache.js";
+import { classifyError, isStaleServable } from "./errors.js";
 import {
   ControlPlaneClient,
   ControlPlaneRequestError,
@@ -44,6 +46,17 @@ export interface AwsProviderOptions {
    * ../ttlCache.ts.
    */
   cacheTtlMs?: number;
+  /**
+   * Milliseconds a previously-fetched value may be served after a *failed*
+   * refresh. Defaults to 0 (off). Only ever applies to transient faults -
+   * network, timeout, throttle, 5xx. An expired credential or a denial is
+   * never answered from a stale value, because both mean something in the
+   * environment changed that a human has to see. See ../ttlCache.ts.
+   */
+  staleGraceMs?: number;
+  /** Called when a stale value is served, so a CLI can warn. Receives the
+   * secret path and the age of the value - never the value. */
+  onStaleValue?: (path: string, ageMs: number, err: unknown) => void;
 }
 
 /**
@@ -80,7 +93,12 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
     this.explicitClient = options.client;
     this.region = options.region;
     this.controlPlane = options.controlPlane;
-    this.rawCache = new TtlCache<string>({ ttlMs: options.cacheTtlMs });
+    this.rawCache = new TtlCache<string>({
+      ttlMs: options.cacheTtlMs,
+      staleGraceMs: options.staleGraceMs,
+      isStaleServable: (err) => isStaleServable(classifyError(err)),
+      onStale: options.onStaleValue,
+    });
     if (this.controlPlane) {
       this.controlPlaneClient =
         this.controlPlane.client ??
@@ -133,7 +151,11 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
         }
         throw new Error(`secret "${path}" has no SecretString or SecretBinary payload`);
       } catch (err) {
-        throw new Error(`could not fetch secret "${path}": ${errorMessage(err)}`);
+        // SecretFetchError, not a plain Error: it classifies the cause, so
+        // an expired SSO session is reported as an auth failure with a
+        // remedy rather than as four broken secrets.
+        if (err instanceof SecretFetchError) throw err;
+        throw new SecretFetchError(this.name, path, err);
       }
     });
   }

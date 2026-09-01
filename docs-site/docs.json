@@ -1,0 +1,50 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "SecRefs",
+  "colors": { "primary": "#22d3a0", "light": "#4ee8b0", "dark": "#16a37e" },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "index",
+              "getting-started/quickstart-node",
+              "getting-started/quickstart-python",
+              "getting-started/references"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "guides/aws",
+              "guides/bitwarden",
+              "guides/vault",
+              "guides/local"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/load-time-vs-use-time",
+              "guides/multiple-accounts",
+              "guides/troubleshooting"
+            ]
+          },
+          { "group": "Reference", "pages": ["reference/cli", "reference/node-api"] }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [{ "label": "GitHub", "href": "https://github.com/Armistice-Group/secrefs" }],
+    "primary": { "type": "button", "label": "secrefs.com", "href": "https://secrefs.com" }
+  },
+  "footer": {
+    "socials": { "github": "https://github.com/Armistice-Group/secrefs" }
+  }
+}

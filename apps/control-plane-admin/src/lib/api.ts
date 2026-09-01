@@ -1,4 +1,4 @@
-import { getAdminToken } from "./auth";
+import { clearAdminToken, getAdminToken, isTokenExpired, notifySessionExpired } from "./auth";
 import type {
   AuthorizationEvent,
   ControlPlaneConfig,
@@ -35,6 +35,17 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getAdminToken();
+
+  // Don't spend a round trip on a token whose own `exp` has already
+  // passed. Catching it here means the session ends the moment it
+  // actually ended, rather than on whichever request happens to fire
+  // next - which might be a mutation the user thought went through.
+  if (token && isTokenExpired(token)) {
+    clearAdminToken();
+    notifySessionExpired();
+    throw new ApiError(401, "Your session has expired. Please sign in again.");
+  }
+
   let response: Response;
   try {
     response = await fetch(`${CONTROL_PLANE_URL}${path}`, {
@@ -61,6 +72,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
+
+    // A 401 while holding a token means the session lapsed - the server
+    // verifies `exp` even though nothing here was watching it. Without
+    // this the token sits in localStorage forever and every screen just
+    // starts erroring, which reads as "the API is broken" rather than
+    // "you need to sign in again".
+    if (response.status === 401 && token) {
+      clearAdminToken();
+      notifySessionExpired();
+      throw new ApiError(401, "Your session has expired. Please sign in again.");
+    }
+
     throw new ApiError(response.status, body.error ?? `Request failed with ${response.status}`);
   }
 

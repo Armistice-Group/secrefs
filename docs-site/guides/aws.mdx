@@ -1,0 +1,53 @@
+---
+title: "AWS Secrets Manager"
+description: "sec://aws/... — authenticated by the credential chain you already use."
+---
+
+```bash
+DB_PASSWORD=sec://aws/prod/db#password
+```
+
+## Authentication
+
+SecRefs uses the **standard AWS credential chain** and never asks you to put a
+key in its own config. In order: environment variables, the shared config and
+credentials files (`AWS_PROFILE`), then container or instance roles.
+
+| Environment | How it resolves | Expiry |
+|---|---|---|
+| EC2 / ECS / EKS | Instance role or IRSA via IMDS | Refreshes automatically, indefinitely |
+| Local, SSO | `~/.aws/sso/cache` | **8–12 hours**, then `aws sso login` |
+| Local, static keys | `~/.aws/credentials` | None |
+
+<Note>
+  On EC2 with an instance role, mid-execution expiry cannot happen — IMDS
+  refreshes on its own. The expiry story is a local-development concern.
+</Note>
+
+## Options
+
+```ts
+new AwsSecretsManagerProvider({
+  region: "us-east-1",
+  cacheTtlMs: 0,       // default: every resolution re-fetches
+  staleGraceMs: 0,     // default: a failed refresh is a failure
+})
+```
+
+## Field extraction
+
+AWS secrets are commonly JSON. `#field` extracts one key and returns **only**
+that key — the rest of the blob never reaches your process.
+
+## Required IAM
+
+```json
+{
+  "Effect": "Allow",
+  "Action": "secretsmanager:GetSecretValue",
+  "Resource": "arn:aws:secretsmanager:us-east-1:111122223333:secret:prod/*"
+}
+```
+
+`secretsmanager:ListSecrets` is additionally used by `secrefs check` as a
+low-privilege reachability probe.

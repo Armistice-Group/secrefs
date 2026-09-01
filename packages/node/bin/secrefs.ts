@@ -71,7 +71,14 @@ async function runCommand(commandArgs: string[], opts: CommonOptions): Promise<v
     }
   } catch (err) {
     if (err instanceof SecRefsResolutionError) {
-      console.error("secrefs: failed to resolve one or more secret references:");
+      // Don't announce a reference problem when the references are fine
+      // and the credentials aren't - the grouped message below already
+      // says what actually happened.
+      if (!err.isAuthOnly) {
+        console.error("secrefs: failed to resolve one or more secret references:");
+      } else {
+        console.error("secrefs: could not authenticate to a secret provider.");
+      }
       console.error(err.message);
     } else {
       console.error(`secrefs: ${err instanceof Error ? err.message : String(err)}`);

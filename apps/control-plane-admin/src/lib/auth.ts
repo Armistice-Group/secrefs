@@ -59,3 +59,64 @@ export function clearAdminToken(): void {
 export function isRedirectSignInAvailable(): boolean {
   return false;
 }
+
+/**
+ * Expiry, from the client's side.
+ *
+ * The control plane verifies `exp` and 401s an expired token, so the
+ * server is not the problem - the console was. Nothing here watched the
+ * clock, so a lapsed session showed up as every screen erroring at once
+ * with no indication that signing in again was the fix.
+ *
+ * These are deliberately parse-only: the signature is the server's
+ * business, and a client that "validated" a token would be claiming a
+ * guarantee it cannot make. All we want is the timestamp, so we can stop
+ * sending a token we already know is dead.
+ */
+
+/** Reads `exp` (seconds since epoch) from a JWT without verifying it.
+ * Returns undefined for anything that isn't a JWT carrying an `exp` -
+ * including the opaque tokens a self-hoster may paste in. */
+export function readTokenExpiry(token: string): number | undefined {
+  const payload = token.split(".")[1];
+  if (!payload) return undefined;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    return typeof exp === "number" ? exp : undefined;
+  } catch {
+    // Not a JWT, or not base64url. Treat as "no expiry information",
+    // never as "expired" - refusing to send a token we simply cannot
+    // read would lock out every non-JWT session for no reason.
+    return undefined;
+  }
+}
+
+/** True when the token's own `exp` has passed. Unreadable or
+ * expiry-less tokens are never reported as expired. */
+export function isTokenExpired(token: string, nowMs: number = Date.now()): boolean {
+  const exp = readTokenExpiry(token);
+  if (exp === undefined) return false;
+  return exp * 1000 <= nowMs;
+}
+
+/** Milliseconds until the token expires, or undefined if unknown. Used to
+ * warn before the session lapses rather than after. */
+export function millisUntilExpiry(token: string, nowMs: number = Date.now()): number | undefined {
+  const exp = readTokenExpiry(token);
+  return exp === undefined ? undefined : exp * 1000 - nowMs;
+}
+
+type SessionExpiredListener = () => void;
+const sessionExpiredListeners = new Set<SessionExpiredListener>();
+
+/** Subscribe to session expiry, so a layout can route to sign-in from one
+ * place rather than every screen handling 401 itself. */
+export function onSessionExpired(listener: SessionExpiredListener): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => sessionExpiredListeners.delete(listener);
+}
+
+export function notifySessionExpired(): void {
+  for (const listener of sessionExpiredListeners) listener();
+}

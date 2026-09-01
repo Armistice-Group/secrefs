@@ -1,0 +1,51 @@
+---
+title: "SecRefs"
+description: "Put a reference in your config instead of a secret. Resolve it from your own vault, in memory, at the moment it's used."
+---
+
+```diff
+- DB_PASSWORD=correcthorsebatterystaple
++ DB_PASSWORD=sec://aws/prod/db#password
+```
+
+The second line is safe to commit. SecRefs resolves it from your own vault at
+runtime — the value never lands on disk, in shell history, or in a CI log.
+
+## Bring your own vault
+
+SecRefs is **not a place to store secrets** and never holds a copy of one. Your
+AWS Secrets Manager, Bitwarden, or HashiCorp Vault instance stays the single
+source of truth. SecRefs just knows how to read from it, and gives you a stable
+name for a value that's free to change underneath.
+
+<CardGroup cols={2}>
+  <Card title="Node.js quickstart" icon="node-js" href="/getting-started/quickstart-node">
+    Install, write a reference, run your app through it.
+  </Card>
+  <Card title="Python quickstart" icon="python" href="/getting-started/quickstart-python">
+    The same thing, for `pip install secrefs`.
+  </Card>
+  <Card title="Reference syntax" icon="link" href="/getting-started/references">
+    What `sec://aws/prod/db#password` actually means.
+  </Card>
+  <Card title="Troubleshooting" icon="bug" href="/guides/troubleshooting">
+    Start here when a reference won't resolve.
+  </Card>
+</CardGroup>
+
+## Why a reference beats a copy
+
+Every plaintext secret that leaves your vault — into a `.env` file, a CI
+variable, a teammate's clipboard — is a copy you now have to track, rotate, and
+eventually leak. You cannot rotate what you cannot find.
+
+A reference inverts that. Rotate the value at the source and every consumer
+holding the reference picks it up, with no redeploy and no coordination. The
+name is stable; the value moves.
+
+<Note>
+  That guarantee depends on **when** you resolve. `init()` reads once at boot;
+  `expandString()` reads at the moment of use. Only the second picks up a
+  rotation without a restart — see
+  [Load time vs use time](/guides/load-time-vs-use-time).
+</Note>

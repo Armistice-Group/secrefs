@@ -1,0 +1,81 @@
+---
+title: "Node API"
+description: "@secrefs/node — the SecRefs class, providers, and errors."
+---
+
+## `SecRefs`
+
+```ts
+import { SecRefs, secRefs } from "@secrefs/node";
+```
+
+`secRefs` is a ready-made singleton using the default providers. Construct your
+own when you need [custom aliases](/guides/multiple-accounts).
+
+| Method | Returns | Notes |
+|---|---|---|
+| `init()` | `string[]` | Expands `process.env` in place; returns the keys rewritten |
+| `expandEnv(map)` | `Record<string,string>` | Expands an arbitrary map, leaving `process.env` alone |
+| `expandString(value)` | `string` | Resolves one reference; a plain value passes through unchanged |
+| `check(env?)` | `CheckResult[]` | Validates without ever returning a value |
+
+```ts
+new SecRefs({
+  providers,      // ProviderRegistry - defaults to the four built-ins
+  strict: true,   // throw on a malformed reference (default)
+})
+```
+
+## Errors
+
+A failed fetch throws `SecretFetchError`, which classifies the cause:
+
+```ts
+import { SecretFetchError } from "@secrefs/node";
+
+try {
+  await secRefs.expandString(ref);
+} catch (err) {
+  if (err instanceof SecretFetchError) {
+    err.kind;    // "auth" | "not_found" | "denied" | "transient" | "unknown"
+    err.remedy;  // e.g. "Run: aws sso login --profile prod" (auth only)
+  }
+}
+```
+
+`kind` is what lets a caller retry a `transient` fault without also retrying a
+dead credential forever.
+
+Expanding a map throws `SecRefsResolutionError`, aggregating every failure. Its
+`isAuthOnly` getter distinguishes "your credentials lapsed" from "your
+references are wrong".
+
+## Providers
+
+```ts
+import {
+  AwsSecretsManagerProvider,
+  BitwardenProvider,
+  VaultProvider,
+  LocalProvider,
+} from "@secrefs/node";
+```
+
+Each takes options documented on its own page. All accept `cacheTtlMs` and
+`staleGraceMs` — see [Load time vs use time](/guides/load-time-vs-use-time).
+
+## Custom providers
+
+Implement `ISecretProvider` (or extend `BaseSecretProvider`, which gives you
+concurrent batching for free) and register it under any alias:
+
+```ts
+class MyProvider extends BaseSecretProvider {
+  readonly name = "mine";
+  async fetchOne({ path, field }) { /* ... */ }
+  async healthCheck() { return { provider: this.name, ok: true }; }
+}
+
+new SecRefs({ providers: { mine: new MyProvider() } });
+// sec://mine/whatever#field
+```

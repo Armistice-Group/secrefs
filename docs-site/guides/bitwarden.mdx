@@ -1,0 +1,45 @@
+---
+title: "Bitwarden Secrets Manager"
+description: "sec://bitwarden/... — end-to-end encrypted, decrypted client-side."
+---
+
+<Note>
+  This is Bitwarden **Secrets Manager**, not the password vault.
+</Note>
+
+```bash
+STRIPE_KEY=sec://bitwarden/stripe-key
+```
+
+## Authentication
+
+```bash
+export BWS_ACCESS_TOKEN="0.xxxx..."      # machine account access token
+export BWS_ORGANIZATION_ID="..."          # only needed to address secrets by name
+```
+
+Self-hosted instances use `BWS_API_URL` and `BWS_IDENTITY_URL`.
+
+## Two ways to address a secret
+
+Bitwarden addresses secrets by **UUID**, with no path hierarchy:
+
+```bash
+API_KEY=sec://bitwarden/9f8e7d6c-5b4a-3210-fedc-ba9876543210
+```
+
+If `BWS_ORGANIZATION_ID` is set, you can use the human-readable secret **name**
+(Bitwarden's "key" field) instead, resolved via one cached lookup:
+
+```bash
+API_KEY=sec://bitwarden/stripe-production
+```
+
+## Why this provider is different
+
+Bitwarden secrets are end-to-end encrypted. There is no plain authenticated REST
+call that returns a value — the official SDK derives a decryption key from the
+access token at login and decrypts **client-side**. That is why this provider
+depends on `@bitwarden/sdk-napi` rather than making an HTTP call.
+
+Nothing is written to disk unless you explicitly opt into a `stateFile`.

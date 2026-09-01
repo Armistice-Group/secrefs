@@ -1,0 +1,95 @@
+---
+title: "Quickstart (Node.js)"
+description: "Replace a secret in your .env with a reference, and run your app through SecRefs."
+---
+
+## Install
+
+<CodeGroup>
+```bash npm
+npm install @secrefs/node
+```
+```bash pnpm
+pnpm add @secrefs/node
+```
+```bash yarn
+yarn add @secrefs/node
+```
+</CodeGroup>
+
+## Try it without a vault
+
+The `local` provider reads a gitignored JSON file, so you can see the mechanism
+work before wiring up AWS or Bitwarden.
+
+<Steps>
+<Step title="Create a mock vault">
+```json .secrefs.local.json
+{ "demo-db": { "password": "hunter2", "user": "postgres" } }
+```
+
+<Warning>
+  Add `.secrefs.local.json` to your `.gitignore`. It holds real values — it is
+  the one file in this workflow that does.
+</Warning>
+</Step>
+
+<Step title="Write a reference instead of a value">
+```bash .env
+PORT=3000
+DB_PASSWORD=sec://local/demo-db#password
+```
+This file is safe to commit.
+</Step>
+
+<Step title="Run your app through SecRefs">
+```bash
+npx secrefs run -- node server.js
+```
+```
+secrefs: resolved 1 secret reference(s): DB_PASSWORD
+```
+Your app reads `process.env.DB_PASSWORD` exactly as before. Nothing downstream changes.
+</Step>
+</Steps>
+
+## Point it at a real vault
+
+Swap the provider segment. Nothing else about your app changes:
+
+```bash .env
+DB_PASSWORD=sec://aws/prod/db#password
+```
+
+SecRefs uses the credentials you already have — the AWS credential chain, a
+Bitwarden machine account token, `VAULT_TOKEN`. It never asks you to put a
+credential in its own config. See [AWS](/guides/aws),
+[Bitwarden](/guides/bitwarden), and [Vault](/guides/vault).
+
+## Use it as a library
+
+```ts
+import { secRefs } from "@secrefs/node";
+
+// Expand everything in process.env, once, at boot.
+await secRefs.init();
+
+// Or resolve a single reference at the point of use.
+const key = await secRefs.expandString("sec://aws/prod/stripe#key");
+```
+
+## Check before you deploy
+
+`check` validates every reference it can see and **never returns a plaintext
+value**, so it is safe to run in CI:
+
+```bash
+npx secrefs check
+```
+
+It catches a typo'd path before it pages someone at 3am.
+
+<Card title="Load time vs use time" icon="clock" href="/guides/load-time-vs-use-time">
+  `init()` and `expandString()` behave differently when a secret rotates. The
+  difference matters — read this before choosing.
+</Card>

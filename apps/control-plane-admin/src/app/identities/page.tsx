@@ -6,7 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { useAsync, useControlPlaneConfig } from "@/lib/useControlPlane";
 import { OrgPage } from "@/components/OrgPage";
 import { CopyButton, EmptyState, ErrorNote, Spinner } from "@/components/primitives";
-import type { Role, ServiceIdentityWithToken } from "@/lib/types";
+import type { Role, ServiceIdentity, ServiceIdentityWithToken } from "@/lib/types";
 
 /** The token is returned exactly once, by the create call. This is the
  * only place it will ever be visible, so the screen says so plainly
@@ -98,6 +98,31 @@ function AddOidcBindingForm({ identityId, onDone }: { identityId: string; onDone
         </button>
       </div>
     </form>
+  );
+}
+
+/** Expiry and last-use, shown together because they answer the same
+ * question: is this credential still meant to exist? An identity nobody
+ * has used in months is the one worth revoking, and it is invisible
+ * unless something says so. */
+function IdentityStatus({ identity }: { identity: ServiceIdentity }) {
+  const expiresAt = identity.expires_at ? new Date(identity.expires_at) : undefined;
+  const expired = expiresAt !== undefined && expiresAt.getTime() <= Date.now();
+  const lastUsed = identity.last_used_at ? new Date(identity.last_used_at) : undefined;
+
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {expired ? (
+        <span className="text-amber-400">Expired {expiresAt!.toLocaleDateString()}</span>
+      ) : expiresAt ? (
+        <span className="text-slate-500">Expires {expiresAt.toLocaleDateString()}</span>
+      ) : (
+        <span className="text-slate-600">No expiry</span>
+      )}
+      <span className={lastUsed ? "text-slate-500" : "text-slate-600"}>
+        {lastUsed ? `Last used ${lastUsed.toLocaleDateString()}` : "Never used"}
+      </span>
+    </p>
   );
 }
 
@@ -206,6 +231,7 @@ function IdentitiesBody({ orgId }: { orgId: string }) {
                 <div className="min-w-0">
                   <p className="text-sm text-slate-200">{identity.name}</p>
                   <p className="ref truncate text-xs text-slate-600">{identity.id}</p>
+                  <IdentityStatus identity={identity} />
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <button

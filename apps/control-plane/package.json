@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "SecRefs control plane - org vault connections, RBAC, and scoped credential minting (v1: AWS Secrets Manager only). See docs/control-plane-design.md.",
-  "license": "MIT",
+  "license": "BUSL-1.1",
   "type": "module",
   "engines": {
     "node": ">=18"

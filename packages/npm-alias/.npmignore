@@ -1,0 +1,2 @@
+# Nothing to exclude beyond the default - `files` in package.json is the
+# allowlist. This file exists only to stop npm falling back to .gitignore.

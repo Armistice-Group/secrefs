@@ -24,7 +24,9 @@
     "secrefs": "./dist/secrefs.cjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18"
@@ -53,5 +55,29 @@
     "tsup": "^8.3.0",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1"
+  },
+  "homepage": "https://secrefs.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Armistice-Group/secrefs.git",
+    "directory": "packages/node"
+  },
+  "bugs": {
+    "url": "https://github.com/Armistice-Group/secrefs/issues"
+  },
+  "keywords": [
+    "secrets",
+    "secret-management",
+    "vault",
+    "aws-secrets-manager",
+    "hashicorp-vault",
+    "bitwarden",
+    "env",
+    "dotenv",
+    "byov",
+    "12-factor"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

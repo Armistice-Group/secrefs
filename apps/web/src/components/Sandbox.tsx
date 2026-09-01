@@ -12,7 +12,7 @@ import { isSecretRef, parseSecretRef, SecRefParseError, type ParsedSecretRef } f
  * using the exact same `sec://` parser SecRefs itself ships
  * (`@secrefs/node/parser`), reused here rather than reimplemented.
  */
-const MOCK_VAULT: Record<string, Record<string, Record<string, string> | string>> = {
+export const MOCK_VAULT: Record<string, Record<string, Record<string, string> | string>> = {
   aws: {
     "prod/db": { password: "S3cur3-P@ss-mock-2024", user: "app_prod" },
     "prod/api-key": "ak_live_mock_9f8e7d6c5b4a",
@@ -48,7 +48,7 @@ interface LineResult extends ParsedLine {
   errorMessage?: string;
 }
 
-function parseEnvText(text: string): ParsedLine[] {
+export function parseEnvText(text: string): ParsedLine[] {
   const lines: ParsedLine[] = [];
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim();
@@ -76,7 +76,7 @@ function parseEnvText(text: string): ParsedLine[] {
 }
 
 /** Simulates a network round-trip to a mock provider - never a real one. */
-function mockFetch(ref: ParsedSecretRef): Promise<string> {
+export function mockFetch(ref: ParsedSecretRef): Promise<string> {
   const delay = 250 + Math.random() * 500;
   return new Promise((resolve, reject) => {
     setTimeout(() => {

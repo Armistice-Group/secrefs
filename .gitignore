@@ -42,6 +42,19 @@ cdk.out/
 *.tfstate.*
 .terraform/
 
+# terraform.tfvars holds the RDS password and any provider tokens. The
+# runbook tells you to `cp terraform.tfvars.example terraform.tfvars`,
+# so this file WILL exist on any machine that has deployed - it must
+# never be the thing a stray `git add -A` picks up.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# CDK caches account ids and hosted-zone lookups here. It is a local
+# cache, not source: committing it publishes the AWS account id and
+# pins stale lookups that break a later deploy.
+cdk.context.json
+
 # editors/os
 .DS_Store
 .vscode/

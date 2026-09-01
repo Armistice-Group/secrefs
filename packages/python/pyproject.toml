@@ -6,7 +6,7 @@ authors = ["SecRefs <hello@secrefs.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://secrefs.com"
-repository = "https://github.com/secrefs/secrefs"
+repository = "https://github.com/Armistice-Group/secrefs"
 packages = [{ include = "secrefs" }]
 
 [tool.poetry.dependencies]

@@ -91,7 +91,7 @@ const HOW_IT_WORKS = [
     step: "04",
     title: "Your process gets real values",
     description:
-      "The child process inherits a fully-hydrated environment. Nothing was ever written to disk.",
+      "The child process inherits a fully-hydrated environment. Nothing was ever written to disk - and a reference resolved at use time picks up a rotation without a restart.",
   },
 ];
 
@@ -122,7 +122,7 @@ export default function HomePage() {
             </a>
           </nav>
           <a
-            href="https://github.com/secrefs/secrefs"
+            href="https://github.com/Armistice-Group/secrefs"
             className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-white/20 hover:text-white"
           >
             <Github className="h-3.5 w-3.5" />
@@ -234,7 +234,7 @@ export default function HomePage() {
             <ul className="mt-5 space-y-2 text-sm text-slate-400">
               <li className="flex gap-2">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-signal-400" />
-                Values expand in memory, once, right before your process starts
+                Values expand in memory, at the moment they&apos;re used
               </li>
               <li className="flex gap-2">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-signal-400" />
@@ -242,7 +242,7 @@ export default function HomePage() {
               </li>
               <li className="flex gap-2">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-signal-400" />
-                Rotate in the vault; every app picks it up on next restart
+                Rotate in the vault; running apps pick it up without a restart
               </li>
             </ul>
           </div>
@@ -352,7 +352,7 @@ export default function HomePage() {
             secrefs.com
           </div>
           <div className="flex gap-6">
-            <a href="https://github.com/secrefs/secrefs" className="hover:text-white">
+            <a href="https://github.com/Armistice-Group/secrefs" className="hover:text-white">
               GitHub
             </a>
             <a href="#quickstart" className="hover:text-white">

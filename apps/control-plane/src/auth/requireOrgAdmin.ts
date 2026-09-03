@@ -19,15 +19,43 @@ export type OrgAdminCheck =
  * oversight - src/server.ts prints a loud warning at boot when this is
  * the case, precisely so it's never silent.
  */
+export const SESSION_COOKIE = "secrefs_session";
+
+/**
+ * Accepts the session from either transport.
+ *
+ * A same-origin console sends an HttpOnly cookie that JavaScript cannot
+ * read, which is the point of serving it from this origin - an injected
+ * script can't exfiltrate what it can't see. A cross-origin console, and
+ * anything scripted, still sends `Authorization: Bearer`.
+ *
+ * The header wins when both are present: an explicit credential is a
+ * deliberate act, an ambient cookie rides along on its own, so on the
+ * request where they disagree the explicit one is the one the caller
+ * meant.
+ */
+export function sessionTokenFrom(
+  authorizationHeader: string | undefined,
+  cookies: Record<string, string | undefined> | undefined,
+): string | undefined {
+  if (authorizationHeader?.startsWith("Bearer ")) {
+    const token = authorizationHeader.slice("Bearer ".length).trim();
+    if (token) return token;
+  }
+  return cookies?.[SESSION_COOKIE] || undefined;
+}
+
 export async function requireOrgAdmin(
   repo: ControlPlaneRepo,
   workOsConfig: WorkOsAuthConfig | undefined,
   authorizationHeader: string | undefined,
   orgId: string,
+  cookies?: Record<string, string | undefined>,
 ): Promise<OrgAdminCheck> {
   if (!workOsConfig) return { ok: true };
 
-  const admin = await resolveAdminPrincipal(authorizationHeader, workOsConfig);
+  const token = sessionTokenFrom(authorizationHeader, cookies);
+  const admin = await resolveAdminPrincipal(token ? `Bearer ${token}` : undefined, workOsConfig);
   if (!admin) {
     return { ok: false, status: 401, error: "missing or unrecognized admin session token" };
   }

@@ -22,7 +22,7 @@ export function registerAuditRoutes(app: FastifyInstance, ctx: AppContext): void
     const orgId = request.query.orgId;
 
     if (orgId) {
-      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
+      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId, request.cookies);
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
       return reply.send({ events: await ctx.repo.listAuthorizationEvents(orgId) });
     }

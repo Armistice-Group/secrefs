@@ -21,7 +21,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
         expiresAt = new Date(Date.now() + expiresInDays * 86_400_000).toISOString();
       }
 
-      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
+      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId, request.cookies);
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
       const { token, tokenHash } = generateBootstrapToken();
@@ -37,7 +37,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
     const orgId = request.query.orgId;
     if (!orgId) return reply.code(400).send({ error: "orgId query parameter is required" });
 
-    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId, request.cookies);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     return reply.send({ serviceIdentities: await ctx.repo.listServiceIdentities(orgId) });
@@ -57,7 +57,7 @@ export function registerIdentityRoutes(app: FastifyInstance, ctx: AppContext): v
       if (!identity) {
         return reply.code(404).send({ error: `no service identity "${request.params.id}"` });
       }
-      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, identity.org_id);
+      const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, identity.org_id, request.cookies);
       if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
       const binding = await ctx.repo.createOidcBinding(identity.id, issuer, subjectPattern);

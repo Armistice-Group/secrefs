@@ -45,7 +45,7 @@ export function registerOrganizationRoutes(app: FastifyInstance, ctx: AppContext
   // looking at instead of showing a bare UUID.
   app.get<{ Params: { orgId: string } }>("/v1/organizations/:orgId", async (request, reply) => {
     const { orgId } = request.params;
-    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId);
+    const admin = await requireOrgAdmin(ctx.repo, ctx.workOsConfig, request.headers.authorization, orgId, request.cookies);
     if (!admin.ok) return reply.code(admin.status).send({ error: admin.error });
 
     const org = await ctx.repo.findOrganizationById(orgId);

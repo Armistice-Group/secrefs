@@ -22,6 +22,15 @@ export {
 export { parseEnvFileText, recoverTruncatedSecRefs } from "./envFile.js";
 
 export { TtlCache, type TtlCacheOptions } from "./ttlCache.js";
+export {
+  CONFIG_FILENAME,
+  ConfigError,
+  buildProviders,
+  loadConfigFrom,
+  parseConfig,
+  type AliasConfig,
+  type SecRefsConfig,
+} from "./config.js";
 
 export {
   BaseSecretProvider,

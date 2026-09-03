@@ -11,6 +11,7 @@ import {
   type ProviderHealth,
   type SecretFetchRequest,
 } from "./base.js";
+import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
 import { TtlCache } from "../ttlCache.js";
 import { classifyError, isStaleServable } from "./errors.js";
 import {
@@ -24,6 +25,14 @@ export type { ControlPlaneCredentialSource };
 
 export interface AwsProviderOptions {
   region?: string;
+  /**
+   * Named profile from the shared AWS config, for addressing more than
+   * one account. Note this does not make a profile self-sufficient: with
+   * SSO each profile needs its own live session, and they expire
+   * independently - which is why an auth failure names the alias that
+   * failed rather than just saying "AWS".
+   */
+  profile?: string;
   /** Inject a pre-configured client (primarily for testing) - also wins
    * over `controlPlane` if both are set, since a test that supplies an
    * explicit client wants full control regardless of the mode. */
@@ -83,6 +92,7 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
 
   private readonly explicitClient?: SecretsManagerClient;
   private readonly region?: string;
+  private readonly profile?: string;
   private readonly controlPlane?: ControlPlaneCredentialSource;
   private readonly controlPlaneClient?: ControlPlaneClient;
   private ambientClient: SecretsManagerClient | null = null;
@@ -92,6 +102,7 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
     super();
     this.explicitClient = options.client;
     this.region = options.region;
+    this.profile = options.profile;
     this.controlPlane = options.controlPlane;
     this.rawCache = new TtlCache<string>({
       ttlMs: options.cacheTtlMs,
@@ -123,7 +134,15 @@ export class AwsSecretsManagerProvider extends BaseSecretProvider {
       return this.buildClientFromMintedCredentials(minted.credentials);
     }
 
-    if (!this.ambientClient) this.ambientClient = new SecretsManagerClient({ region: this.region });
+    if (!this.ambientClient) {
+      this.ambientClient = new SecretsManagerClient({
+        region: this.region,
+        // fromNodeProviderChain honours the same precedence as the
+        // ambient default, just pinned to one profile - so instance
+        // roles and env vars still work when no profile is named.
+        ...(this.profile ? { credentials: fromNodeProviderChain({ profile: this.profile }) } : {}),
+      });
+    }
     return this.ambientClient;
   }
 

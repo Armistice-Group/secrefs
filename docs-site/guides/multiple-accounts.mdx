@@ -50,10 +50,42 @@ Cannot authenticate to provider "aws-staging".
 
 so you know which `aws sso login` to run.
 
-<Note>
-  The CLI currently uses the four default aliases above. Custom aliases are a
-  library-level feature today — a project config file for the CLI is planned.
-</Note>
+## Using aliases from the CLI
+
+Drop a `secrefs.config.json` at your project root. `secrefs run` finds it from
+any subdirectory, the way git does.
+
+```json secrefs.config.json
+{
+  "providers": {
+    "aws-prod":    { "type": "aws", "profile": "acme-prod", "region": "us-east-1" },
+    "aws-staging": { "type": "aws", "profile": "acme-stg" },
+    "bw-eng":      { "type": "bitwarden", "tokenEnv": "BWS_TOKEN_ENG" }
+  }
+}
+```
+
+<Warning>
+  **This file never holds a credential, and the parser refuses to let it.**
+  Every secret is referenced by the *name* of the environment variable that
+  carries it (`tokenEnv`) or by an AWS profile name. A config file that could
+  hold a token would recreate the `.env` problem one level up, in the tool built
+  to solve it — so `"token"`, `"password"`, `"apiKey"` and similar keys are
+  rejected outright rather than ignored.
+</Warning>
+
+Declared aliases **replace** the four built-ins rather than merging with them. A
+project that declares `aws-prod` and `aws-staging` almost certainly does not
+want a third, differently-configured `aws` still quietly resolving — that is how
+a reference reaches the wrong account.
+
+The CLI prints which config it loaded, because "which config am I actually
+using" is the first question when an alias resolves somewhere unexpected:
+
+```
+secrefs: using secrefs.config.json (3 aliases: aws-prod, aws-staging, bw-eng)
+secrefs: resolved 2 secret reference(s): DB_PASSWORD, TEST_DB
+```
 
 ## Service identity lifetime
 

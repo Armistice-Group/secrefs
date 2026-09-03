@@ -6,18 +6,40 @@
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",
-  "bin": { "secrefs": "bin/secrefs.js" },
-  "files": ["index.js", "index.d.ts", "bin", "README.md", "LICENSE"],
-  "keywords": ["secrets", "secret-management", "vault", "aws-secrets-manager", "hashicorp-vault", "bitwarden", "byov"],
+  "bin": {
+    "secrefs": "bin/secrefs.js"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "secrets",
+    "secret-management",
+    "vault",
+    "aws-secrets-manager",
+    "hashicorp-vault",
+    "bitwarden",
+    "byov"
+  ],
   "homepage": "https://secrefs.com",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Armistice-Group/secrefs.git",
     "directory": "packages/npm-alias"
   },
-  "bugs": { "url": "https://github.com/Armistice-Group/secrefs/issues" },
-  "engines": { "node": ">=18" },
-  "publishConfig": { "access": "public" },
+  "bugs": {
+    "url": "https://github.com/Armistice-Group/secrefs/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@secrefs/node": "0.1.0"
   }

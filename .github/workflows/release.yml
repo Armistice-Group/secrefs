@@ -10,9 +10,9 @@ name: Release
 #
 # One-time setup, per package, before the first run:
 #   npm   - npmjs.com > package > Settings > Trusted Publisher > GitHub
-#           Actions; repo Armistice-Group/secrefs, workflow release.yml
+#           Actions; repo secrefs/secrefs, workflow release.yml
 #   PyPI  - pypi.org/manage/account/publishing/ > add a *pending*
-#           publisher (project `secrefs`, owner Armistice-Group, repo
+#           publisher (project `secrefs`, owner secrefs, repo
 #           secrefs, workflow release.yml). "Pending" is what lets a
 #           project that does not exist yet be claimed by its first
 #           trusted publish, so no token is needed even the first time.

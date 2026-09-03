@@ -256,7 +256,7 @@ export default function ForVendorsPage() {
               Talk to us
             </a>
             <a
-              href="https://github.com/Armistice-Group/secrefs/blob/main/docs/proxy-mode-design.md"
+              href="https://github.com/secrefs/secrefs/blob/main/docs/proxy-mode-design.md"
               className="flex items-center gap-2 rounded-md border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/30"
             >
               Read the specification
@@ -272,7 +272,7 @@ export default function ForVendorsPage() {
             secrefs.com
           </a>
           <div className="flex gap-6">
-            <a href="https://github.com/Armistice-Group/secrefs" className="hover:text-white">
+            <a href="https://github.com/secrefs/secrefs" className="hover:text-white">
               GitHub
             </a>
             <a href="/#quickstart" className="hover:text-white">

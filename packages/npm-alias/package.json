@@ -28,11 +28,11 @@
   "homepage": "https://secrefs.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Armistice-Group/secrefs.git",
+    "url": "git+https://github.com/secrefs/secrefs.git",
     "directory": "packages/npm-alias"
   },
   "bugs": {
-    "url": "https://github.com/Armistice-Group/secrefs/issues"
+    "url": "https://github.com/secrefs/secrefs/issues"
   },
   "engines": {
     "node": ">=20"

@@ -26,7 +26,7 @@ export default function SiteHeader({ links }: { links: NavLink[] }) {
         </nav>
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com/Armistice-Group/secrefs"
+            href="https://github.com/secrefs/secrefs"
             className="flex items-center gap-2 rounded-md border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-white/20 hover:text-white"
           >
             <Github className="h-3.5 w-3.5" />

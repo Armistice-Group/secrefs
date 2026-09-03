@@ -1,6 +1,6 @@
 # SecRefs
 
-[![CI](https://github.com/Armistice-Group/secrefs/actions/workflows/ci.yml/badge.svg)](https://github.com/Armistice-Group/secrefs/actions/workflows/ci.yml)
+[![CI](https://github.com/secrefs/secrefs/actions/workflows/ci.yml/badge.svg)](https://github.com/secrefs/secrefs/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@secrefs/node?label=%40secrefs%2Fnode)](https://www.npmjs.com/package/@secrefs/node)
 [![PyPI](https://img.shields.io/pypi/v/secrefs?label=secrefs)](https://pypi.org/project/secrefs/)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20BUSL--1.1-blue)](LICENSING.md)

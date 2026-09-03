@@ -121,4 +121,4 @@ MIT. See [LICENSE](./LICENSE).
 
 The client libraries are MIT permanently and unconditionally — the SecRefs
 control plane is licensed separately. See
-[LICENSING.md](https://github.com/Armistice-Group/secrefs/blob/main/LICENSING.md).
+[LICENSING.md](https://github.com/secrefs/secrefs/blob/main/LICENSING.md).

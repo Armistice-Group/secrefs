@@ -66,7 +66,13 @@ const db = await openDatabase({
   ssl: databaseSsl,
 });
 const ctx = createContext(db, cipher, { oidcConfig, workOsConfig });
-const app = buildApp(ctx, { corsOrigins });
+// Serving the console from this origin lets its session live in an
+// HttpOnly cookie instead of localStorage, and makes CORS unnecessary.
+// Unset leaves this an API-only service, which is what a deployment
+// running the console elsewhere wants.
+const consoleDir = process.env.SECREFS_CP_CONSOLE_DIR || undefined;
+
+const app = buildApp(ctx, { corsOrigins, consoleDir });
 
 app
   .listen({ port: PORT, host: "0.0.0.0" })
@@ -76,10 +82,11 @@ app
       : ", OIDC: not configured (bootstrap tokens only)";
     const adminNote = workOsConfig ? ", admin auth: WorkOS" : ", admin auth: NONE (see warning above)";
     const corsNote = corsOrigins.length ? `, CORS: ${corsOrigins.join(", ")}` : "";
+    const consoleNote = consoleDir ? `, console: ${consoleDir}` : "";
     // Never log DATABASE_URL itself - it carries the password.
     const dbNote = databaseUrl ? "postgres" : DB_PATH;
     console.log(
-      `secrefs control plane listening on :${PORT} (db: ${dbNote}${oidcNote}${adminNote}${corsNote})`,
+      `secrefs control plane listening on :${PORT} (db: ${dbNote}${oidcNote}${adminNote}${corsNote}${consoleNote})`,
     );
   })
   .catch((err) => {

@@ -44,7 +44,7 @@ used. The reference is stable; the value underneath it is free to rotate.
 
 Full documentation lives with the canonical package:
 **[@secrefs/node](https://www.npmjs.com/package/@secrefs/node)** ·
-[github.com/Armistice-Group/secrefs](https://github.com/Armistice-Group/secrefs) ·
+[github.com/secrefs/secrefs](https://github.com/secrefs/secrefs) ·
 [secrefs.com](https://secrefs.com)
 
 ## License

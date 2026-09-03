@@ -41,10 +41,10 @@
     ]
   },
   "navbar": {
-    "links": [{ "label": "GitHub", "href": "https://github.com/Armistice-Group/secrefs" }],
+    "links": [{ "label": "GitHub", "href": "https://github.com/secrefs/secrefs" }],
     "primary": { "type": "button", "label": "secrefs.com", "href": "https://secrefs.com" }
   },
   "footer": {
-    "socials": { "github": "https://github.com/Armistice-Group/secrefs" }
+    "socials": { "github": "https://github.com/secrefs/secrefs" }
   }
 }

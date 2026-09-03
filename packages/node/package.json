@@ -60,11 +60,11 @@
   "homepage": "https://secrefs.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Armistice-Group/secrefs.git",
+    "url": "git+https://github.com/secrefs/secrefs.git",
     "directory": "packages/node"
   },
   "bugs": {
-    "url": "https://github.com/Armistice-Group/secrefs/issues"
+    "url": "https://github.com/secrefs/secrefs/issues"
   },
   "keywords": [
     "secrets",

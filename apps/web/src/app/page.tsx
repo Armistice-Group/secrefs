@@ -366,7 +366,7 @@ export default function HomePage() {
             <a href="/for-vendors" className="hover:text-white">
               For vendors
             </a>
-            <a href="https://github.com/Armistice-Group/secrefs" className="hover:text-white">
+            <a href="https://github.com/secrefs/secrefs" className="hover:text-white">
               GitHub
             </a>
             <a href="#quickstart" className="hover:text-white">

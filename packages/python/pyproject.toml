@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "secrefs"
-version = "0.1.0"
+version = "0.2.0"
 description = "BYOV secret reference engine - expand sec:// references in memory at runtime"
 authors = ["SecRefs <hello@secrefs.com>"]
 license = "MIT"

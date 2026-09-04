@@ -41,6 +41,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@secrefs/node": "0.2.0"
+    "@secrefs/node": "workspace:*"
   }
 }

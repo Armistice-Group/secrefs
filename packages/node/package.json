@@ -1,6 +1,6 @@
 {
   "name": "@secrefs/node",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "BYOV secret reference engine for Node.js - expand sec:// references in memory at runtime",
   "license": "MIT",
   "type": "module",

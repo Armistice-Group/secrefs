@@ -1,6 +1,6 @@
 {
   "name": "secrefs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Alias for @secrefs/node - the Bring Your Own Vault secret reference engine. Installs and re-exports the real package.",
   "license": "MIT",
   "type": "module",
@@ -41,6 +41,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@secrefs/node": "0.1.0"
+    "@secrefs/node": "0.2.0"
   }
 }
